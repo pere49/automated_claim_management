@@ -76,7 +76,7 @@ class ImageFileTests(unittest.TestCase):
         w.files.file_chosen.emit(self.folder / "shot.png")
         self.assertTrue(wait_until(lambda: not w.session.busy))
         self.assertEqual(w.page_pane.position_text, "Page 1 of 1")
-        self.assertEqual(w.ocr_panel.text, "TOTAL    100.00\nTHANK YOU")
+        self.assertTrue(w.ocr_panel.text.startswith("TOTAL    100.00\nTHANK YOU"))
         self.assertEqual(w.files.state_of("shot.png"), "read")
 
     @unittest.skipUnless(heic_supported(), "this Pillow/pillow-heif build cannot write HEIC")
@@ -89,8 +89,10 @@ class ImageFileTests(unittest.TestCase):
 
     def test_display_and_ocr_share_one_frame_for_a_rotated_photo(self):
         path = make_image(self.folder / "sideways.jpg", size=(240, 120), orientation=ROTATE_90_CW)
-        pixmap = page_renderer.render_page(path, 1, dpi=300)
+        pixmap, scale = page_renderer.render_page(path, 1, 300, 200)
         pixels = read_image_rgb(path)
+        self.assertEqual(scale, 1.0, "an image is shown at its own pixel size")
+        self.assertEqual(page_renderer.page_sizes(path, 300), [(120, 240)])
         self.assertEqual((pixmap.width(), pixmap.height()), (120, 240), "orientation flag not applied for display")
         self.assertEqual(pixels.shape[:2], (240, 120), "orientation flag not applied for OCR")
 
@@ -98,7 +100,7 @@ class ImageFileTests(unittest.TestCase):
         bad = self.folder / "broken.png"
         bad.write_bytes(b"not an image")
         with self.assertRaises(StageError) as ctx:
-            page_renderer.page_count(bad)
+            page_renderer.page_sizes(bad, 300)
         self.assertEqual((ctx.exception.stage, ctx.exception.file), ("display", "broken.png"))
 
 

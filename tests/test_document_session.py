@@ -79,7 +79,8 @@ class ReadingTests(SessionTestCase):
         self.assertEqual(h.session.pages_read(), 3)
         self.assertFalse(h.session.busy)
         page2 = h.session.reading(2)
-        self.assertEqual([r.text for r in page2.rows], ["TOTAL    200.00", "THANK YOU"])
+        self.assertEqual([r.text for r in page2.rows],
+                         ["TOTAL    200.00", "THANK YOU", "DATE:02/08/2026", "PIN: A012345678Z"])
         self.assertTrue(page2.rows_grouped)
         self.assertEqual(h.problems, [])
 
@@ -88,7 +89,7 @@ class ReadingTests(SessionTestCase):
         self.assertEqual(h.open_and_wait(self.pdf("doc.pdf", 3)), FINISHED)
         self.assertEqual(h.session.pages_read(), 3)
         self.assertIsNotNone(h.session.reading(2).result.error)
-        self.assertEqual(len(h.session.reading(3).rows), 2)
+        self.assertEqual(len(h.session.reading(3).rows), 3)
         self.assertEqual([(e.stage, e.page, level) for e, level in h.problems], [("ocr", 2, ERROR)])
 
     def test_reader_crash_on_one_page_is_contained(self):
@@ -127,7 +128,7 @@ class ReadingTests(SessionTestCase):
         self.assertEqual(h.open_and_wait(self.pdf("doc.pdf", 1)), FINISHED)
         page = h.session.reading(1)
         self.assertFalse(page.rows_grouped)
-        self.assertEqual(len(page.rows), 3)  # one per segment, nothing lost
+        self.assertEqual(len(page.rows), 4)  # one per segment, nothing lost
         self.assertEqual(h.stages(), ["config"])
 
     def test_grouping_failure_on_a_page_is_a_warning_not_a_loss(self):
@@ -139,7 +140,7 @@ class ReadingTests(SessionTestCase):
             self.assertEqual(h.open_and_wait(self.pdf("doc.pdf", 2)), FINISHED)
         self.assertEqual([(e.stage, e.page, level) for e, level in h.problems],
                          [("layout", 1, WARNING), ("layout", 2, WARNING)])
-        self.assertEqual(len(h.session.reading(1).rows), 3)
+        self.assertEqual(len(h.session.reading(1).rows), 4)
 
 
 class CacheTests(SessionTestCase):

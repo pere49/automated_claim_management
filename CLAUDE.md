@@ -41,7 +41,9 @@ This system runs fully offline. When it breaks, a screenshot is the entire diagn
   - app/errors.py, app/config_files.py, app/paths.py — the shared error shape, config-file reading, and project-folder resolution.
   - app/ocr/ — the OCR and image-preparation module (public entry: `OcrReader`; proven internals in pipeline.py, rules in enhance_rules.json). RapidOCR (PaddleOCR on ONNX Runtime) only — Tesseract was tried and dropped on measured evidence, QR reading was designed and dropped before being built.
   - app/layout/ — grouping OCR segments into printed rows (rows.py, row_rules.json). Imports nothing from OCR or GUI, so the matcher can reuse it.
-  - app/gui/ — the PySide6 review window, one file per pane plus the background OCR worker and the open-document session; settings in gui_settings.json.
+  - app/matching/ — finding a claimed date, amount and PIN in a document's text (rules in matching_rules.json, chosen by the measured trial in tools/search_criteria_trial). The decision package: imports nothing from OCR, image or GUI code. After any change here, run tools/search_criteria_trial/verify_app_matcher.py — it must report 0 disagreements with the trial.
+  - app/gui/ — the PySide6 review window, one file per pane plus the background OCR worker, the open-document session, the search controller and highlight outlines; settings in gui_settings.json.
+- tools/ — prototypes and measurement trials (each says so in its docstring): ocr_resolution_trial, search_criteria_trial. Their answer keys live in private/ folders and their results in outputs/, both ignored by git.
 - tests/ — the automated tests (unittest, standard library). tests/fakes.py holds a fake OCR reader for forcing failure paths.
 
 ## Working style

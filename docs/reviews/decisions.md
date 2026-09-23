@@ -1,15 +1,19 @@
 # Decisions log
 
-**Status: BINDING.** Blueprint, code and reviews follow this file. Where this file and `docs/blueprint.md` disagree, this file wins and the blueprint is corrected. If a decision here turns out to create a hole, raise it as a question — do not quietly work around it.
+**Status: BINDING record of decisions and their reasoning.**
+
+**Precedence (revision 3, user decision 2026-09-23):** `docs/blueprint.md` is the single source of truth for the current design. This file records each decision and why it was taken; when the blueprint moves on, the affected entry here is corrected with a dated note (never silently). `docs/NEXT_SESSION.md` only points to the other two. If a decision here turns out to create a hole, raise it as a question — do not quietly work around it.
 
 **Owner** = the project owner's decision, taken in conversation.
 **Derived** = a consequence I worked out while applying an owner decision. Derived entries bind in the same way, but they are the ones most worth challenging, because the owner has not separately confirmed each.
 
-Revision 2. D4 and D6 were rewritten in this revision; the superseded text is noted inside each.
+Revision 3 (2026-09-23): precedence rule above; D13–D22 added; D1, D2, D11 carry dated notes on what supersedes them. Revision 2 rewrote D4 and D6.
 
 ---
 
 ## D1 — What CONFIRMED means
+
+> **Superseded in wording, 2026-09-23.** CONFIRMED is now called **PASS** (D13), and it means date, amount and PIN all found on the same receipt — no invoice number (see D7's correction).
 
 **Owner.** A row is CONFIRMED when the PIN and every receipt's details match the claim form: for each receipt, the invoice number, the date and the total amount are the same as the corresponding entry in the .xlsx.
 
@@ -21,6 +25,8 @@ Anything else — a mismatch, a document that failed to open, or a match that fa
 ---
 
 ## D2 — The officer decides last, in both directions
+
+> **Names updated, 2026-09-23.** The system outcome is PASS / CAUTION / REVIEW (D13), not CONFIRMED / REFUTED / UNDECIDED. The rest of this entry stands: the system finding and the officer's decision are two fields, never merged.
 
 **Owner.** The manual check is always available. The officer may **decline a row the system passed**, and **confirm a row the system flagged**, including incomplete or unmatched documents, after checking by hand.
 
@@ -142,6 +148,8 @@ Layouts 1 and 2 stay supported for parsing and sum checks; their rows report a m
 
 ## D11 — Three flags *(new)*
 
+> **Superseded, 2026-09-23 (D13).** The three states are PASS, CAUTION and REVIEW. A missing PIN is REVIEW, not a separate red. The RED/YELLOW mapping below is kept for history only.
+
 **Owner.**
 
 | Flag | When | Officer action |
@@ -174,12 +182,54 @@ Every flag can be changed after manual check (D2).
 
 ---
 
+## D13 — Three states: PASS, CAUTION, REVIEW *(revision 3)*
+
+**Owner**, 2026-09-23. Every system finding is PASS, CAUTION or REVIEW — never a plain true or false. PASS: date, amount and PIN all found on the same page. CAUTION: only a possible match (faded decimal point), a PIN only under a seller label, or a different buyer PIN printed. REVIEW: date or amount not found exactly ("yellow review"), found on several pages with no way to choose, or no PIN found. Colours when shown (Stage C): PASS green, CAUTION orange, REVIEW yellow.
+
+## D14 — Country is not used; the PIN comes from the claimant *(revision 3)*
+
+**Owner**, 2026-09-23. Neither the Excel nor the receipts state a country. The PIN to search for is the claimant's, found by the Excel row's name in a person-to-PIN table supplied at search time (people in one country share a PIN). No currency check runs. Supersedes D4 and D5 for now. In Stage B the PIN is typed as a search keyword; the table arrives in Stage C.
+
+## D15 — Search rules chosen by measured trial *(revision 3)*
+
+**Owner**, 2026-09-23, approving the winners of `tools/search_criteria_trial/` (15,673 cases, 65 real pages, zero false matches for all three keys). Amounts: found with or without cents, only as a value on its own; without cents only beside a currency word or "/=", or ending a total line; printer marks, attached currency words, tax-code letters trimmed; split values joined only at a decimal tail. Dates: every printed form, label prefix trimmed, fused time tolerated. PIN: format-positional letter/digit repair, one differing character only for a configured OCR look-alike pair, fused label words removed. Details and numbers: blueprint §6. **Why:** a wrong PASS is worse than a REVIEW, so the rules were ranked by false matches first; each rejected alternative (no-cents anywhere, any-one-character PIN, general segment joining) was measured to produce false matches.
+
+## D16 — Faded decimal point: CAUTION only *(revision 3)*
+
+**Owner**, 2026-09-23. "430 00 KSh" read for 430.00 is reported as a possible match, never a PASS, because the same repair matches quantity-then-price lines.
+
+## D17 — One receipt per page *(revision 3)*
+
+**Owner**, 2026-09-23. Claims will be submitted one receipt per page as a strict intake rule; pages holding several receipts are not handled. This is what makes D12 (all values from one receipt) hold at page level.
+
+## D18 — Highlights *(revision 3)*
+
+**Owner**, 2026-09-23. Neighbouring segments extend along the same printed row only. One colour per key (amount blue, date purple, PIN teal). Every occurrence is highlighted.
+
+## D19 — Search the whole document; the viewer scrolls *(revision 3)*
+
+**Owner**, 2026-09-23. A search covers every page of the open file and brings the matching page into view. Moving through pages never re-runs a search. The viewer is one continuous vertical scroll. In Stage C each Excel row is searched once and mapped to its page.
+
+## D20 — OCR readings cached until the application closes *(revision 3)*
+
+**Owner**, 2026-09-23, reversing the earlier "no caching" decision. Readings are kept in memory, keyed by path, size and modification time; nothing is written to disk. Switching files loses nothing; closing the application asks first.
+
+## D21 — OCR settings kept as measured *(revision 3)*
+
+**Owner**, 2026-09-23. RapidOCR runs at its defaults. Lower detection resolution, full-resolution recognition, memory arena, larger batches and parallel pages were each measured and not adopted (evidence in `app/ocr/engine_settings.json`). No whole-page orientation correction (sideways pages still yield their values). Photos and screenshots (JPG, PNG, HEIC) are claim files; Word files are not supported.
+
+## D22 — Hiding OCR time before the app opens: decided last *(revision 3)*
+
+**Owner**, 2026-09-23. Starting with Windows, or email-triggered OCR, is decided at the final stages only; either needs readings to outlive the window, so it goes with the persistence decision.
+
+---
+
 ## Open, needing an owner decision
 
 | # | Question | Why it cannot be derived |
 |---|---|---|
 | **O1** | **What anchors the total?** Under pure search-and-match, a claimed 30,000 that appears anywhere on a receipt matches — including as a deposit, a line item or a "balance due" on a 50,000 invoice. My proposed rule, doc-type-free: the matched amount must be **the largest amount on the receipt, or sit beside a total-type keyword**; otherwise YELLOW. That handles the part-paid hotel invoice correctly. Confirm or replace. | It is a question about what you want a part-payment to do, not an evidence question. |
-| **O3** | Does the company hold a different tax ID per country, or one ID everywhere? D4 derives the country from which ID matched, so a single global ID breaks that derivation. | Depends on the company's actual registrations. |
+| ~~O3~~ | *Closed 2026-09-23 by D14: country is not used.* | — |
 
 O2 (how to know a row was paid by card) is **closed** by D10 — nothing depends on it.
 

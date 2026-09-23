@@ -1,109 +1,179 @@
-# Session handoff
+# Session handoff — start of GUI Stage C
 
-Written 2026-09-23, for whoever (human or Claude) picks this up next. Read this file first, in full, before opening anything else or asking the user to re-explain something. If this file and `docs/blueprint.md` ever disagree, trust `docs/blueprint.md` — this file is a pointer and a task list, not the record of truth.
+Written 2026-09-23 at the end of the session that built and confirmed GUI Stages A and B. **Read this whole file before doing anything else, and before asking the user to explain anything** — it is written so the user does not have to repeat themselves. It points and summarises; it does not decide. Precedence (user decision): **`docs/blueprint.md` is the single source of truth**; `docs/reviews/decisions.md` records each decision and why (revision 3, D1–D22); this file says where things stand and what is next.
 
-Reading order after this file: `docs/blueprint.md` §7 (the interface and its build sequence), §6 (the matching design Stage B builds), §12 (built / designed / open). Then `docs/reviews/decisions.md` only if something below needs its reasoning.
+After this file, read: blueprint §1 (purpose, governing rule), §6 (matching), §7 (the interface and its stages), §12 (built / designed / open); then `decisions.md` D12–D22. Then look at `images/` (`ls`) — the user's current test claim files.
 
-## Where the project actually stands
+---
 
-**GUI Stage A is built and tested, and waiting for the user's by-eye confirmation.** Start it with `start_app.bat` (or `.venv\Scripts\python.exe -m app`). Picking a PDF in the left list shows it at once and reads its pages with the real OCR on a background thread, the page on screen first; each page's text appears beside it grouped into printed rows. Raw Previous/Next page and the Errors tab work. The search fields and a disabled Search button are present and do nothing.
+## 1. The project in one paragraph
 
-**OCR readings are cached in memory until the app closes (added 2026-09-23 at the user's request).** Switching files asks nothing and loses nothing; a half-read file resumes with only its missing pages; failed pages are retried on the next open; an edited file (size or modification time changed) is read again. With `read_ahead` on in `gui_settings.json`, the other PDFs in the folder are read in the background when the engine is idle. The file list shows each file's state ("read", "reading 2/4", "could not open"). Closing the app asks first, because that is where the cache is lost. Pages are rendered for display on demand (`page_renderer.py`, tens of milliseconds), so the page never waits for OCR. Measured on real PDFs: first page shown in 0.35 s, a cached file's text shown in 0.08 s, a page jumped to is read next. Known cost: a page already being read cannot be interrupted, so opening an unread file can wait up to one page's reading time (about 10-15 s) before its own reading starts.
+An offline Windows tool for one finance officer. A claim arrives as an **Excel claim sheet** (the claimed lines) plus a **PDF of receipts**. The tool reads every receipt page with OCR, and for each claimed line checks that the receipt shows the **exact date**, the **exact amount** and the **claimant's PIN** on the same page. Each line gets **PASS / CAUTION / REVIEW**; the officer makes the final call. **Governing rule: a wrong PASS is worse than a REVIEW** — whenever evidence is weak, missing or conflicting, the tool says so and the officer decides. Python 3.13, PySide6, RapidOCR (CPU), 8 GB RAM, no network at run time.
 
-**Do not start Stage B until the user says Stage A is confirmed.** Their check is: open real PDFs, compare the OCR panel against each page by eye, and try the file switching and error tab.
+## 2. Status at a glance
 
-**Code layout (decided and built this session):** one package, `app/`.
-- `app/errors.py` — `StageError`, the one error shape (`OcrStageError` subclasses it). `ERROR` / `WARNING` levels.
-- `app/config_files.py` — every JSON config is read through `read_json_config()`, so config problems are always the same structured error.
-- `app/ocr/` — the proven OCR module, moved from `tools/ocr_smoke/` unchanged except for the shared error base. Public entry: `OcrReader` (`start`, `load_pages`, `read_page`). `pipeline.py` is the internal machinery (was `ocr_compare.py`).
-- `app/layout/` — groups OCR segments into printed rows (`group_rows`, rules in `row_rules.json`). Imports nothing from OCR or GUI, so the matcher can reuse it.
-- `app/gui/` — one file per pane, plus `ocr_worker.py` (background thread, page on screen first), `document_cache.py` (readings kept until the app closes), `document_session.py` (open file, OCR thread, cache, read-ahead), `page_renderer.py` (on-demand page display), `main_window.py` (layout and wiring only), `application.py` (start-up and the last-resort exception hook), and settings in `gui_settings.json`.
-- `app/ocr/image_files.py` — the one reader for photo/screenshot files (JPG, PNG, HEIC), used by both the OCR and the display so they share one pixel frame (orientation flag applied).
-- `app/ocr/engine_settings.json` — RapidOCR start-up settings; empty (defaults) after measurement, with every tested option and why it was not adopted recorded in the file.
-- `tests/` — 72 tests, standard-library unittest. **`run_tests.bat` is now the health command** (CLAUDE.md updated to say so). `tests/fakes.py` has a `FakeReader` that forces every failure path.
-- `tools/` and `outputs/` were removed (empty once the OCR module moved).
+| Stage | What | State |
+|---|---|---|
+| OCR module | read each page (measure → prepare → RapidOCR), never crash on a bad page | built, measured, proven |
+| Stage A | window: file list, page viewer, OCR text panel, error tab, background OCR, cache, read-ahead | **built and confirmed by the user** |
+| Stage B | live search panel (date, PIN, amount) over the whole document, highlights, continuous scroll | **built and confirmed by the user (2026-09-23)** |
+| **Stage C** | **Excel claim rows replace the typed fields; each row searched once, mapped to its page; PASS / CAUTION / REVIEW** | **next — plan in §9** |
+| Stage D | final layout: OCR panel removed, Verify / Decline, dispositions, claim-level "verify all" | after C |
 
-**Repository:** the user ran `git init` in the project folder on 2026-09-23. There are no commits and no remote yet. The user asked about pushing to `https://github.com/pere49/automated_claim_management.git`, then withdrew that. Do not commit or push without being asked. `.gitignore` was rewritten to keep out every claim document anywhere in the tree (PDF, images, Excel/CSV, emails, Office lock files), the person-to-PIN table and company tax IDs, secrets, logs, screenshots, case data and outputs. Real PIN tables go in `private/` or a file named `person_pins*`, `*_pins.*` or `*.local.json`. Only `*.example.json` templates with fabricated values may be committed. It was verified with `git check-ignore`, and 47 code, doc and test files remain committable.
+Health command: **`run_tests.bat`** — 120 tests, all passing at the end of this session. Start the app: **`start_app.bat`** (or `.venv\Scripts\python.exe -m app`).
 
-**Libraries:** `PySide6-Essentials` 6.11.2 added, with the reason in `requirements.in`. `pytesseract` removed from the list and from `.venv`. `requirements.txt` is now the pinned `pip freeze` of `.venv`. `python-docx` is still listed but no code uses it; ask before removing it.
+## 3. Project map (what every file does)
 
-## What testing found and fixed this session
+```
+app/                        the application (python -m app)
+  errors.py                 StageError — the one error shape (.summary one line, .full_text with traceback); ERROR / WARNING
+  config_files.py           read_json_config(): every JSON config read the same way, problems -> StageError("config")
+  paths.py                  PROJECT_ROOT; config folder paths resolved against it
+  ocr/                      OCR (public entry: OcrReader in reader.py)
+    reader.py               start() / load_pages() / read_page(); maps every box back onto the page (geometry)
+    pipeline.py             proven internals: analyse -> advise -> apply -> RapidOCR; PageResult (+ .applied steps), Word (+ .page_box)
+    geometry.py             exact inverse of crop/rotate/resize -> Word.page_box (page as displayed)
+    image_files.py          the one JPG/PNG/HEIC reader (OCR and display share it: one pixel frame)
+    enhance_rules.json      page-preparation rules, with measured evidence
+    engine_settings.json    RapidOCR start-up settings (empty = defaults) + every option tried and why rejected
+  layout/                   OCR segments -> printed rows (rows.py, row_rules.json); no OCR/GUI imports
+  matching/                 THE DECISION PACKAGE — imports nothing from OCR, image or GUI code
+    search.py               public: Query, prepare_page, search_page, search_document -> DocumentMatches (best_page, places, …)
+    amount_search.py        amount finder (trial winner A9); faded decimal -> POSSIBLE
+    date_search.py          date finder (D4)            pin_search.py   PIN finder (P6)
+    money.py                parse_typed_amount (exact Decimal, refuses ambiguity), amount_forms
+    dates.py                date_forms (day-first, month names)      tokens.py   row -> tokens remembering their segments
+    found.py                Found + strengths EXACT / CORRECTED / POSSIBLE     rules.py + matching_rules.json
+  gui/                      PySide6 window, one file per pane
+    application.py          run(), startup-failure window, last-resort exception hook -> Errors tab
+    main_window.py          layout + signal wiring only
+    document_session.py     the open file, OCR thread, cache, read-ahead      document_cache.py  readings kept until the app closes
+    ocr_worker.py           background OCR, page on screen first               page_renderer.py   page sizes + pictures on demand
+    document_view.py        continuous scroll, lazy page drawing, highlight overlays     page_pane.py  viewer + Prev/Next page
+    file_panel.py           left file list (PDF, JPG/PNG/HEIC; .xlsx arrives in Stage C)
+    ocr_text_panel.py       OCR text of the page in view        error_tab.py   every error, newest first, copyable
+    search_panel.py         typed search (Stage B; replaced by the claim-row panel in Stage C)
+    search_controller.py    runs searches; prepares each page's text when it arrives; live updates
+    search_summary.py       result in plain words     highlights.py   hits -> outlines (amount blue, date purple, PIN teal)
+    settings.py + gui_settings.json   window settings (folder, file types, dpi, zoom, viewer, colours)
+tests/                      unittest, all synthetic data; fakes.py = FakeReader (forces every failure path)
+tools/                      PROTOTYPES / MEASUREMENTS (say so in their docstrings)
+  ocr_resolution_trial/     OCR speed/accuracy trials (answer key in private/, ignored)
+  search_criteria_trial/    matching-rule trial (15,673 cases) + verify_app_matcher.py (app == trial winners)
+docs/  blueprint.md · NEXT_SESSION.md · reviews/decisions.md (binding record) · reviews/01_consistency.md, audit/ (old review leads)
+start_app.bat · run_tests.bat · requirements.in (each library with its reason) · requirements.txt (pinned)
+Ignored by git: images/ (claim files), private/ (answer keys, PIN tables), outputs/ (trial results), .venv/
+```
 
-- **Row grouping chained two printed lines** on `yem_p2.pdf`: "9928", printed between "RECEIPT NUMBER:" and "DATE:", pulled both lines into one row. Fixed with a second rule, `max_overlap_per_height` in `row_rules.json`: segments that overlap horizontally are never on the same row. Checked on five real, differently laid-out pages. A unit test reproduces the case.
-- **A corrupt PDF stayed locked by Windows** after it failed to open, because the stored error kept the PDF library's internal state alive. `StageError` now releases that state when it is created. The traceback text is unaffected. The integration test would fail again if this regressed.
-- **Quitting without closing the window** (for example at Windows logoff) would have left the OCR thread running and crashed Qt on exit. The session now also stops on application quit. Both quit paths were run on the real entry point and exit cleanly with code 0.
-- **The configured window (1600 × 950) is larger than this machine's screen** (1280 × 680 at 150 % scaling). The window now opens maximized when the configured size does not fit. Panes can no longer be dragged to zero width, so the file list hides only through its toolbar toggle.
+## 4. How a claim file flows through the code today
 
-## OCR speed — measured 2026-09-23, do not re-measure from scratch
+1. `file_panel` lists files in `images/` → the officer clicks one → `document_session.open()` gets page sizes (`page_renderer`, no rendering) and shows the whole document in `document_view` at once.
+2. `ocr_worker` (background thread) renders the pages and reads the missing ones, **page in view first**: `OcrReader.read_page` → `pipeline.process_page` (analyse → advise → apply → RapidOCR) → `geometry.attach_page_boxes` (every Word gets `page_box`).
+3. Back on the window thread, `document_session` groups the words into printed rows (`app/layout`) and stores the reading in `document_cache` (kept until the app closes; keyed by path + size + modification time).
+4. `search_controller.page_arrived` prepares that page's text for searching (`matching.prepare_page`: tokens + trimmed cores, once).
+5. A search (`matching.search_document`) is lookups over the prepared pages; `highlights.shapes_for` turns hits into outlines via `Word.page_box`; `document_view` draws them as overlays and scrolls to the best page.
+6. Every failure anywhere becomes a `StageError` in the Errors tab; one bad page / row / file never stops the rest.
 
-About 10 s per page on this 4-core CPU (detection 5-8 s, recognition 4-13 s). Every engine option was tested on all 28 pages in images/ for identical text and positions; none was adopted (details in `app/ocr/engine_settings.json`): a memory arena was identical but held about 1.2 GB more memory for 5-9% speed; a larger recognition batch changed the output on 17 of 28 pages; reading two pages at once raised total throughput about 22% but made each single page take about 16 s instead of 10 s. The speed-ups that were adopted change only *when* reading happens, never what is read: the cache, the page on screen first, read-ahead, and on-demand page display. **Detection resolution was measured with a full accuracy test** (`tools/ocr_resolution_trial/`, prototype; answer key in its `private/` folder, results in `outputs/ocr_resolution_trial/summary.json`, both ignored by git). On 22 pages / 194 hand-checked values: current 10.2 s/page, 186/194 found; detect-only 1600 px 8.1 s, 186/194; 1280 px 6.5 s, 182/194; 1024 px 5.4 s, 182/194; 800 px 4.6 s, 169/194; whole image 1600 px 8.5 s, 185/194; 1280 px 6.7 s, 183/194. Every lower setting reads every page somewhat differently. **Decided 2026-09-23: keep the current setting.** Also tried and not adopted: recognising each text line from the full-resolution page (detection unchanged): 11.1 vs 10.6 s/page, 186/194 either way (2 recovered, 2 lost) — the current misses are faint or blurred print, not resolution. RapidOCR ignores `Det.limit_side_len` on large pages, so a detection-only change would need an override of its detector sizing, guarded by a start-up check that the override took effect. To re-run: `run_trial.py` then `score.py` in that folder.
+## 5. What Stages A and B delivered (all confirmed working by the user)
 
-## The next task, once Stage A is confirmed: GUI Stage B
+**Stage A:** app package and launchers; file list; background OCR with a responsive window; in-memory cache of every reading (switching files loses nothing, asks nothing; closing asks); read-ahead of the other files; page on screen read first; OCR text panel grouped into rows; Errors tab; start-up failure window; exception hook; photos/screenshots (JPG/PNG/HEIC) as claim files; Word files deliberately not supported.
 
-Blueprint §7 has the agreed spec, and §6 the matching design. In summary:
+**Stage B:** search panel (calendar date picker with "not set", PIN any format, amount with ambiguity refusal); search over every page, live updates while reading, best page brought into view, results per key (pages, places, "possible", "OCR character correction"), no verdict; highlights on every occurrence, one colour per key, neighbours on the same row faint, possible matches dashed; Previous / Next match; continuous scroll viewer with lazy drawing (on-screen pages at once, one above/below when idle, far pages released); exact page positions for highlights.
 
-1. **First, keep the full processing plan on each page result.** `PageResult.used_steps` stores only step names. Highlighting needs the crop offset, rotation angle and resize factor that were applied, because word boxes are in the coordinates of the processed image, not of the displayed page. Store the applied `Step` objects (name and params) on `PageResult`, then write one mapping function from processed-image coordinates to page coordinates. Test it by drawing boxes on real pages that were cropped and rotated.
-2. **Build the matcher as its own clean, tested package** (for example `app/matching/`), the way the OCR module was built. It should cover:
-   - money parsing into exact `Decimal` values, never float, returning "cannot parse" when the separators are ambiguous;
-   - generating the printed forms of an amount and a date;
-   - exact search over rows, joining adjacent segments on a row (reuse `app/layout`);
-   - the PIN closed search: at Stage B the PIN is typed into the PIN field as a search keyword; the person-to-PIN table (claimant name -> PIN) comes with Stage C, not before;
-   - picking which segments to highlight, on the same printed row only.
+**Measured on real claims (4-core CPU):** OCR ≈ 10 s per page (unchanged by design); preparing a page's text for search 5–15 ms (done when the page arrives); searching all 49 real claim pages ≈ 60 ms; search / next match with the page already drawn ≈ 20 ms; bringing an undrawn page into view 70–110 ms (decoding its photo at 200 dpi).
 
-   It must import nothing from OCR or GUI code, per CLAUDE.md, and must not be a throwaway: Stage C reuses it unchanged.
-3. **Wire the search button to it** against the open page, and draw the highlight in `page_pane.py`'s graphics view.
+**Proven:** `app/matching` equals the approved trial winners on all 15,673 trial cases (0 disagreements; `verify_app_matcher.py`); page positions within 2.5 px under forced crop/rotate/resize (`tests/test_geometry.py`) and by eye on real straightened/cropped pages.
 
-Still to put to the user, at Stage C (not before). Ask, don't assume:
-- **The person-to-PIN table's form.** Where it comes from, what shape it has, and how names are matched between it and the Excel (exact spelling or normalised). Its real values must stay in `private/` or an ignored file name (see `.gitignore`).
+## 6. Measurements and trials already done — do not repeat
 
-**Do not start the search work until the user asks.** On 2026-09-23 the user said explicitly not to proceed to the next step yet.
+- **OCR engine settings:** memory arena (identical output, +1.2 GB — rejected), larger recognition batch (changed output on 17/28 pages — rejected), explicit threads, two pages in parallel (each page slower) — none adopted. Evidence in `app/ocr/engine_settings.json`.
+- **Detection resolution** (22 pages, 194 hand-checked values): current 10.2 s/page, 186/194 found; 1600 px 8.1 s, 186/194 but every page read differently; ≤1280 px loses values. **User: keep current.** Full-resolution recognition: 186/194, slower — not adopted. Remaining misses are faint/blurred print.
+- **Search rules** (65 real pages incl. Kenyan and Ethiopian claims, 497 hand-checked values, 14,700 real decoys, ~560 fabricated): amount 326/333 found, 0 false of 12,633; date 80/81, 0 of 201; PIN 83/83, 0 of 1,992 (the 85 look-alike cases accepted by the user). Rejected alternatives and why: blueprint §6.
+- **Orientation:** sideways/upside-down pages still yield their values; row order scrambles. User: no correction.
 
-## Stage B decisions taken 2026-09-23 (user), before any Stage B code
+## 7. Decisions in force (details: decisions.md D13–D22 and blueprint)
 
-- **Stage B shows what was found, not a verdict.** Per key: found or not, on which pages, where. PASS / CAUTION / REVIEW verdicts arrive with Stage C.
-- **Verdicts (for Stage C):** PASS / CAUTION / REVIEW stay. Date or amount not matching exactly -> REVIEW (the user calls it "yellow review"). CAUTION = a different buyer PIN printed, or our PIN only under a seller label.
-- **The three search keys are date, amount and PIN.** Date and amount are each expanded into their set of printed forms before searching (e.g. 1200 -> 1200, 1,200, 1,200.00, 1200.00; dates in all their written forms).
-- **Amounts count anywhere on the receipt** (no largest-amount or beside-a-total-label requirement), **but only as a value standing on its own**: never inside a longer number, code or word (e.g. 500 must not match inside 4245002 or a PIN).
-- **One receipt per page** is assumed (it will be a strict intake rule); multi-receipt pages are not handled.
-- **The search field is a Date field** (no free keyword).
-- **Search covers every page of the open file**, and the page where the match is found is brought into the viewer. Page changes by the officer only move the viewer; they do not re-run the search. Stage C does the search once per Excel row and maps rows to pages, so clicking a row opens its page with no new search.
-- **The page viewer becomes a continuous scroll view** of the whole document (user request), not one page at a time.
-- **Joining split segments** only when they are close together on the row (gap limit in config), proven by decoy tests.
-- Still open from this round: PIN look-alike characters (user asked for a recommendation), and the clarifications listed in the session's final message.
+PASS / CAUTION / REVIEW (D13) · country not used; PIN = the claimant's, from a person-to-PIN table (D14; typed in Stage B) · search rules = measured trial winners, values always exact after normalisation (D15) · faded decimal point = CAUTION only (D16) · one receipt per page, a strict intake rule (D17) · highlights: same row, one colour per key, every occurrence (D18) · whole-document search, continuous scroll, each Excel row searched once and mapped to its page (D19) · readings cached in memory until the app closes (D20) · OCR at RapidOCR defaults, no orientation correction, photos yes, Word no (D21) · hiding OCR time before the app opens (start with Windows / email-triggered) decided last (D22) · document type never changes behaviour · RapidOCR is the only engine · decision code never returns a plain true/false.
 
-## Decided — do not re-open these without a stated reason
+## 8. Environment and repository
 
-- **CONFIRMED means** PIN found, plus date and amount matching the Excel, all on the same receipt. No invoice number (D7 was corrected to say so).
-- **Value matching is always exact** after normalisation, never fuzzy. Labels may tolerate OCR noise.
-- **Document type never changes behaviour.**
-- **Status names are PASS, CAUTION and REVIEW** (2026-09-23). CLAUDE.md and the blueprint now say so; older text saying CONFIRMED / UNDECIDED means PASS / REVIEW.
-- **OCR readings are cached in memory until the app closes; nothing is persisted to disk** (2026-09-23, reversing the earlier "no caching" decision; blueprint §8).
-- **Stage B takes the PIN as a typed search keyword**; the person-to-PIN table is Stage C (2026-09-23).
-- **PINs are fabricated placeholders** for now. No Excel sample exists yet, so build against the row shape in the blueprint plus a synthetic fixture.
-- **RapidOCR is the only engine.** QR reading is out of scope.
-- **The GUI is PySide6**, in `app/gui/`, with the layout above. The file list shows PDFs only until Stage C adds Excel. Images (JPG/PNG) are not listed.
-- **Switching files asks nothing** (nothing is lost); **closing the app asks first** when any readings are cached.
-- **The file list shows PDFs and photos/screenshots (JPG, JPEG, PNG, HEIC, HEIF)** (2026-09-23). An image is one page; checked on all 7 real image files in images/ (display and OCR frames identical).
-- **No whole-page orientation correction** (user, 2026-09-23: as long as the text is detected, orientation does not matter). Measured: sideways/upside-down pages still yield their values, but the row order in the OCR panel is scrambled or reversed. Do not re-propose without a new reason.
-- **Highlights stay on the same printed row** (2026-09-23).
-- **Highlight colour depends on the value type**: one colour each for amount, date and PIN, so the officer sees at a glance which value matched where (2026-09-23).
-- **Highlighting design (agreed in discussion, 2026-09-23):** page-frame boxes are computed once per page in the background worker (the applied crop/rotate/resize combined into one transform, applied to every box) and cached beside the rows; highlights are overlay items in the page's QGraphicsScene in page pixels (Qt handles zoom/scroll; cosmetic pens); search runs over the cached rows. Prerequisite: PageResult must keep the applied steps with their parameters, not just their names, and the mapping must be tested to within 1-2 px on synthetic pages with forced crop/rotate/resize plus real pages by eye.
-- **Country is not used for now** (2026-09-23). Neither the Excel nor the receipts state one. The PIN to search for is the claimant's: the Excel gives the person's name, and a person-to-PIN table supplied at search time gives the PIN. People in the same country share a PIN. No currency check runs. `decisions.md` D4 and D5 carry a dated note, and blueprint §6 and §9 are updated.
+- Windows 10, 4 cores, screen 1280×680 at 150 %. Python 3.13.4 in `.venv`. Key packages: PySide6-Essentials 6.11.2, rapidocr 3.9.2, onnxruntime 1.30.0, pymupdf 1.28.2, openpyxl 3.1.5 (already installed — Stage C needs no new library), numpy 2.5.3, pillow 12.3.0.
+- `images/` (git-ignored) now holds the user's **full claim files**: a cash claim sheet PDF and a card claim PDF (claim sheet + card statement + receipts), receipt bundles for two claim weeks, a 26-page Ethiopian receipts bundle (telebirr slips, a bank screenshot, ERCA receipts), and two .docx files (ignored by design). Real names and PINs appear in them — never copy them into committed files (a privacy sweep on 2026-09-23 replaced the one real PIN that had crept into examples with the fabricated `A012345678Z`).
+- Git: branch **`backend`** of `https://github.com/pere49/automated_claim_management.git`. Pushed: commit `4ca2920` (Stage A era). **Everything since — Stage B, the trials, today's docs — is uncommitted.** Ask the user whether to commit and push (never force). The older `blueprint.md` on `master` is superseded by `docs/blueprint.md`; retiring it is the user's call.
 
-## Still genuinely open — ask, don't assume
+---
 
-From blueprint §12, plus the Stage B questions above:
-- **The total anchor.** What anchors "the total" on a page showing several amounts. Needed before the aggregate total check.
-- **PDF and Excel mismatch.** Whether to warn when the loaded PDF and Excel don't obviously belong to the same claim.
-- **Duplicate detection.** How it (`decisions.md` D8) fits the simplified single-engine flow.
-- **Card and statement matching.** Whether it is ever built.
-- **Memory on long claims.** While a file is being read, all its pages are rendered in memory at once (about 25 MB per A4 page at 300 dpi, released after). Fine for the claims seen so far; revisit if long claims appear (blueprint §13).
-- **Hiding OCR time before the app is opened — decide at the very end, not before.** The user's two candidate approaches: start the application with Windows and let it read in the background, or let the (future) email intake trigger OCR as claims arrive, so readings are ready when the officer opens the app. Either would need readings to outlive the window (today the cache is memory-only), which ties it to the persistence decision in blueprint §8. Do not build either until the user brings it up.
+## 9. The Stage C plan
 
-## Standing rules, restated because they matter more than any single task
+### 9.1 Goal and definition of done
 
-From `CLAUDE.md`, both marked crucial:
-- **File organization.** One job per file. Public entry points are exported from each folder's `__init__.py`. Config lives in its own file next to the code that reads it.
-- **Error handling.** Wrap each stage at one clear boundary and raise `StageError` or a subclass. One bad item never stops a batch. Nothing prints to a console, and nothing exits the process on a recoverable error.
+The officer opens a receipts PDF and its Excel claim sheet. Every claim row is searched once (reusing the Stage B matcher), mapped to its receipt page, and given PASS / CAUTION / REVIEW with a plain reason. Clicking a row (or row Previous / Next) shows its page with that row's highlights instantly, with no new search. The OCR text panel stays visible (Stage C exists so the whole flow — row → search → page → highlight → verdict — can be watched end to end). Done = all tests pass, `verify_app_matcher.py` still reports 0 disagreements, the real-claim acceptance run (9.6) gives the expected verdict on every row, every failure path has been broken on purpose, and the user confirms by eye.
 
-**Verify before reporting something works.** Run it against real input, and deliberately break each new failure path. This session that approach found the problems listed above, none of which reading the code had shown. Run `run_tests.bat` before finishing any task and report the result.
+### 9.2 What the claim sheets already tell us (from the two claim-form PDFs in `images/`, which have a digital text layer)
+
+- Header: the claimant's **Name** at the top (this selects the PIN).
+- Columns: Date · customers visited / expense description · project number / cost centre · **Receipt No** · category columns with account codes (Motor Vehicle Fuel, Travel, Breakfast, Lunch, Dinner, Daily Allowance, Hotel, Other) · **Rate** · **Total** with a currency in the header ("Total:USD", "Total:KES").
+- Each row's amount sits in one category column; Total = amount × Rate. A totals row, "Less Advance", "Balance", signature dates follow.
+- Dates are printed like "16-Jul-26"; amounts like "13,000.00". **Receipt No** is 1, 2, … — the receipt's order in the bundle, **not** its page number (the card PDF's page 1 is the claim sheet itself, pages 2–4 a card statement, page 5 the receipts).
+- Observed traps: the July **cash** claim is 16 rows of a daily allowance in USD, while the July receipts bundle is in Ethiopian Birr with different dates — per-diem rows may have no receipt at all, and currency differs. On the **card** claim one row's claimed amount equals the card-statement line, while the hotel invoice shows a larger total (a part-payment) — under the current rules that row becomes REVIEW (amount not on the receipt page; statement matching deferred).
+- These are PDFs of the sheets, not the Excel files. **The real .xlsx structure must still be confirmed.**
+
+### 9.3 Questions to put to the user first (each with the recommendation to offer)
+
+1. **A real Excel sample** (.xlsx, fabricated values, same layout). *Recommend:* essential before building the reader; meanwhile the reader is designed to find its header row and columns by configurable header words, not fixed positions.
+2. **Which value is "the claimed amount" searched on the receipt:** the category-column amount (receipt currency) or Total after Rate (claim currency)? *Recommend:* the category amount — the receipt prints its own currency; show Total only for the claim sum.
+3. **Rows that need no receipt** (daily allowance / per-diem): exempt categories listed in config (shown "no receipt needed", not REVIEW), or always REVIEW? *Recommend:* a config list of exempt categories, shown distinctly, never PASS.
+4. **Receipt No:** use it only to choose between several pages that each have all three keys (otherwise REVIEW)? *Recommend:* yes — as a tie-breaker, never to override the search.
+5. **Person-to-PIN table:** its source and format (JSON or .xlsx in `private/`), and name matching — exact, or ignoring case / extra spaces / name order? *Recommend:* ignore case and extra spaces only; anything else = "claimant not in PIN table" → REVIEW. A committed `*.example.json` with fabricated values documents the format.
+6. **Pages that are not receipts** inside the PDF (the claim sheet itself, card statements): *Recommend:* no special handling — they cannot hold the PIN, so they never make a PASS; ambiguity counts only pages holding all three keys.
+7. **One receipt claimed by two rows:** *Recommend:* both rows REVIEW "same receipt as row N" (a cheap in-claim duplicate check; cross-claim D8 stays open).
+8. **Aggregate check:** *Recommend:* Stage C shows the Excel's own arithmetic (sum of row totals vs the sheet's total / balance, exact Decimal); the sum of receipts' declared totals waits for the total-anchor decision (blueprint §12).
+9. **Seller-label and other-buyer-PIN CAUTION checks** (blueprint §6): *Recommend:* build in Stage C, label lists in config, measured on the real pages first (they must never fire on a receipt that correctly shows the claimant's PIN as buyer).
+10. **Switching the Excel file:** *Recommend:* nothing is lost (row results are recomputed from cached OCR in milliseconds), no question asked — until Stage D adds officer decisions.
+11. **Old .xls files:** openpyxl reads .xlsx/.xlsm only. *Recommend:* list .xlsx/.xlsm; an .xls is refused with a clear message (save as .xlsx).
+
+Record every answer in blueprint §6/§7/§9 and as new D-entries in `decisions.md` **before** writing code.
+
+### 9.4 Design (to confirm against the answers)
+
+- **`app/claims/`** (new package; no OCR/GUI imports), one job per file:
+  - `model.py` — `Claim` (file, sheet, claimant name, currency, rows, sheet total/balance) and `ClaimRow` (row number, date, description, receipt-no hint, category, amount, rate, total, problems).
+  - `workbook.py` — open the .xlsx with openpyxl (`data_only=True`), pick the claim sheet; every failure → `StageError("excel")`.
+  - `sheet_layout.py` — find the header row, the claimant name, and each column **by header words from config**, not positions.
+  - `row_parser.py` — cells → `ClaimRow`, **one row at a time; a bad row is recorded on the row, never stops the sheet**. Money: openpyxl returns floats — convert with `Decimal(repr(value))` and accept only if it equals itself rounded to the currency's two places; otherwise the row is "amount unreadable" (never rounded silently). Formula cells without a cached value → "value not saved in the file" (ask the officer to open and save it in Excel). Dates: `datetime` cells, or text like "16-Jul-26" parsed day-first with the month names in config.
+  - `pin_table.py` — load the person-to-PIN table from `private/` (path in config); name normalisation per answer 5.
+  - `claim_rules.json` — header words, category names, exempt categories, totals-row words, name label, date formats, PIN-table location.
+- **`app/matching/verdict.py`** (decision code; returns PASS / CAUTION / REVIEW + a reason code + page, never a bool). From a row's `DocumentMatches`: candidate pages = pages with date EXACT, amount EXACT and PIN EXACT/CORRECTED. Exactly one → PASS (downgraded to CAUTION by the seller-label / other-buyer-PIN checks). More than one → REVIEW "found on pages …" unless the Receipt No tie-breaker (answer 4) resolves it. None → CAUTION if the only gap is a POSSIBLE amount (faded decimal); else REVIEW naming what is missing on the best page. Claimed value missing/unreadable, or claimant not in the PIN table → REVIEW with that reason. Same page claimed by two rows → per answer 7. Rules and label lists in `matching_rules.json`.
+- **Row matching** (`app/gui/row_matcher.py` or similar): reuse the prepared pages — first move the prepared-page cache out of `search_controller.py` into its own small file (`prepared_pages.py`) shared by both. Search all rows once when both files are open (one row per idle moment so the window never stalls), and when a new page arrives search **only that page** for every row and merge (~1 ms per row). Result per row: `DocumentMatches`, verdict, chosen page, hits.
+- **Window:** file list adds `.xlsx`/`.xlsm` (gui_settings); one PDF and one Excel open at once (each marked in the list). The lower-right search panel is replaced by **`claim_panel.py`** (+ a table model file): claimant / sheet / totals line; table (row, date, description, receipt no, amount, status colour, page); row Previous / Next (separate from the PDF's Previous / Next page); a "why" line for the selected row (each key: found where / missing). Selecting a row → scroll to its page and show only that row's highlights (precomputed: instant). Status colours PASS green, CAUTION orange, REVIEW yellow (D13). OCR panel unchanged.
+- **Errors:** every Excel / PIN-table / row failure is a `StageError` in the Errors tab, never containing claimed values, names or PINs.
+
+### 9.5 Build order — each step verified before the next
+
+0. Ask 9.3; record answers in blueprint and decisions.md; decide the package names with the user if anything differs from 9.4.
+1. `app/claims` model + workbook + layout + row parser + `claim_rules.json`; tests on synthetic .xlsx built inside the tests with openpyxl.
+2. Person-to-PIN table + committed `person_pins.example.json` (fabricated); tests.
+3. `matching/verdict.py` + seller-label / other-buyer-PIN checks; measure the checks on the real pages (extend `tools/search_criteria_trial` — they must never fire where the claimant's PIN is correctly the buyer); `verify_app_matcher.py` must still report 0 disagreements.
+4. Shared prepared-page cache + row matcher (incremental, idle-time); tests with FakeReader.
+5. Claim panel + wiring; window tests (FakeReader + synthetic .xlsx).
+6. Real acceptance (9.6), screenshots checked by eye, timing, each failure path broken on purpose.
+7. Update blueprint / decisions / this file; `run_tests.bat`; hand to the user for the by-eye check.
+
+### 9.6 Tests and acceptance
+
+- **Synthetic .xlsx fixtures generated in the tests:** normal sheet; header not on row 1; merged header cells; extra sheets; blank and totals rows; amounts as floats that are and are not exact cents; text dates and real dates; formulas with no cached value; missing required column; claimant name missing; corrupt file; password-protected file; `.xls`.
+- **Verdict:** a unit test for every branch (PASS, each CAUTION, each REVIEW reason, tie-breaker, same receipt twice, claimant not in table).
+- **Window:** rows appear with statuses; clicking a row scrolls to its page with only its highlights; statuses update as pages are read; switching PDF or Excel; failures land in the Errors tab once.
+- **Real acceptance (private, git-ignored):** build .xlsx claim sheets whose rows reproduce the real receipts' dates and amounts from the hand-checked answer keys (`tools/*/private/`), in `tools/stage_c_acceptance/private/`, with the expected verdict per row labelled by hand; run with the real OCR on the real receipts bundles; every row must get its expected verdict. Include deliberate mismatches (one cent off, wrong date, claimant without a PIN, per-diem row, the card part-payment row).
+
+### 9.7 Risks to keep in view
+
+Floats from Excel (never round silently) · formulas without saved values · header layouts that differ between the cash and card forms · currency of the claimed amount vs the receipt · per-diem rows without receipts · the claim sheet / statement pages inside the receipts PDF · two receipts on one page (neighbour outlines reach across; D17) · a part-paid invoice (REVIEW by design) · real names and PINs must never reach committed files, logs or error messages · performance with many rows × many pages (incremental search, idle-time work).
+
+## 10. After Stage C
+
+Stage D (blueprint §7): remove the OCR text panel; Verify / Decline acting on the row matched to the page in view; system finding and officer disposition kept as two fields (D2); a row is finished only with a disposition; claim-level "verify all" locked until every row has one. Still open (blueprint §12): the total anchor for the receipts-sum check; warning when the PDF and Excel don't belong together; cross-claim duplicate detection (D8); card/statement matching; memory on very long claims; hiding OCR time before the app opens (last).
+
+## 11. Standing rules (CLAUDE.md — both marked crucial)
+
+One job per file; public entry points in each folder's `__init__.py`; config beside the code that reads it, never inline thresholds. Every stage wrapped at one boundary with `StageError`; one bad item never stops a batch; nothing printed; nothing exits. Money is exact `Decimal`, never float. Logs and errors never contain document text, names, amounts or PINs. Only synthetic data in committed files. Do not add a library without saying why. One stage at a time; do not start Stage D before the user confirms C. **Verify before reporting:** run against real input, break each failure path on purpose, run `run_tests.bat` and report the result.

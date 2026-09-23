@@ -4,7 +4,8 @@
     reader.start()                        # once; slow (loads the engine)
     pages = reader.load_pages(path, dpi)  # render every page of one file
     for page in pages:
-        result = reader.read_page(page)   # never raises; check result.error / .warning
+        result = reader.read_page(page)   # never raises; check result.error / .warning;
+                                          # each Word has .box (prepared copy) and .page_box (page as shown)
 
 start() and load_pages() raise OcrStageError on failure — there is nothing
 useful to carry on with if the engine cannot start or the file cannot be
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config_files import read_json_config
-from app.ocr import pipeline
+from app.ocr import geometry, pipeline
 from app.ocr.pipeline import OcrStageError, Page, PageResult
 
 DEFAULT_ENGINE_SETTINGS = Path(__file__).resolve().with_name("engine_settings.json")
@@ -68,9 +69,22 @@ class OcrReader:
         return pipeline.load_pages(path, dpi=dpi)
 
     def read_page(self, page: Page) -> PageResult:
-        """Prepare and read one page. Never raises for a page-level failure."""
+        """Prepare and read one page, and map every text box back onto the
+        page as rendered (Word.page_box, for highlights). Never raises for a
+        page-level failure."""
         self._require_started()
-        return pipeline.process_page(page, self._rules, self._engine)
+        result = pipeline.process_page(page, self._rules, self._engine)
+        try:
+            height, width = page.bgr.shape[:2]
+            geometry.attach_page_boxes(result, width, height)
+        except Exception as exc:
+            # Unreachable when preparation itself failed (nothing was applied, so the map is the identity);
+            # otherwise the text stays usable and only this page's highlights are missing.
+            if result.warning is None:
+                result.warning = OcrStageError(
+                    "geometry", "text positions could not be mapped onto the page; highlights will be missing",
+                    file=page.source.name, page=page.number, cause=exc)
+        return result
 
     def _require_started(self) -> None:
         if not self.ready:

@@ -15,7 +15,7 @@ from app.ocr import OcrStageError, Page, PageResult, Word
 
 def word(text: str, left: float, top: float, width: float = 40, height: float = 10) -> Word:
     box = [[left, top], [left + width, top], [left + width, top + height], [left, top + height]]
-    return Word(text, 0.99, box)
+    return Word(text, 0.99, box, page_box=[list(p) for p in box])
 
 
 def make_pdf(path: Path, pages: int) -> Path:
@@ -30,7 +30,7 @@ def make_pdf(path: Path, pages: int) -> Path:
 
 class FakeReader:
     """Takes the page count from the real (synthetic) PDF; each page reads as
-    two rows of synthetic text without any OCR.
+    page_words(n) without any OCR.
 
     start_error / load_error: raise that OcrStageError from start() / load_pages().
     page_errors: page numbers whose PageResult carries an OCR error.
@@ -40,9 +40,10 @@ class FakeReader:
 
     def __init__(self, *, start_error: bool = False, load_error: bool = False,
                  page_errors: set[int] = frozenset(), crash_pages: set[int] = frozenset(),
-                 delay: float = 0.0) -> None:
+                 delay: float = 0.0, no_page_boxes: bool = False) -> None:
         self.start_error, self.load_error = start_error, load_error
         self.page_errors, self.crash_pages, self.delay = page_errors, crash_pages, delay
+        self.no_page_boxes = no_page_boxes
         self.ready = False
         self.pages_read: list[tuple[str, int]] = []
 
@@ -71,5 +72,21 @@ class FakeReader:
             error = OcrStageError("ocr", "the OCR engine raised an error while reading a page",
                                   file=page.source.name, page=page.number, cause=RuntimeError("simulated"))
             return PageResult(page.number, [], [], None, [], 0.0, error=error)
-        words = [word("TOTAL", 10, 10), word(f"{page.number}00.00", 100, 11), word("THANK YOU", 10, 40)]
+        words = page_words(page.number)
+        if self.no_page_boxes:
+            for w in words:
+                w.page_box = None
         return PageResult(page.number, words, [], None, [], 0.01)
+
+
+FAKE_PIN = "A012345678Z"
+
+
+def page_words(n: int) -> list[Word]:
+    """Page n reads: "TOTAL n00.00" / "THANK YOU" / "DATE:0n/08/2026", plus
+    "PIN: A012345678Z" on even pages (all fabricated)."""
+    words = [word("TOTAL", 10, 10), word(f"{n}00.00", 100, 11), word("THANK YOU", 10, 40),
+             word(f"DATE:{n:02d}/08/2026", 10, 70, width=150)]
+    if n % 2 == 0:
+        words.append(word(f"PIN: {FAKE_PIN}", 10, 100, width=160))
+    return words

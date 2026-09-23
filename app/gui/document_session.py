@@ -83,6 +83,10 @@ class DocumentSession(QObject):
         self._warm_up.emit()
 
     @property
+    def has_document(self) -> bool:
+        return self.current is not None
+
+    @property
     def path(self) -> Path | None:
         return self.current.path if self.current else None
 
@@ -107,7 +111,8 @@ class DocumentSession(QObject):
         try:
             key = file_key(path)
             doc = self.cache.get_or_create(key)
-            doc.page_count = page_renderer.page_count(path)
+            doc.page_sizes = page_renderer.page_sizes(path, self._settings.pdf_render_dpi)
+            doc.page_count = len(doc.page_sizes)
         except StageError as exc:
             self.problem.emit(exc, ERROR)
             return False
@@ -133,9 +138,14 @@ class DocumentSession(QObject):
             self.file_state_changed.emit(path, self._state_text(self.cache.get(path)))
         self._maybe_read_ahead()
 
+    @property
+    def page_sizes(self) -> list[tuple[int, int]]:
+        return list(self.current.page_sizes or []) if self.current else []
+
     def render(self, number: int):
-        """The open document's page as a pixmap. Raises StageError(stage="display")."""
-        return page_renderer.render_page(self.current.path, number, self._settings.pdf_render_dpi)
+        """The open document's page as (pixmap, scale to page pixels). Raises StageError(stage="display")."""
+        return page_renderer.render_page(self.current.path, number, self._settings.pdf_render_dpi,
+                                         self._settings.display_dpi)
 
     def shutdown(self) -> None:
         """Stop the background thread. Safe to call more than once."""

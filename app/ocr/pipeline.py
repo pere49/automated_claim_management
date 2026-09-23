@@ -52,7 +52,7 @@ import importlib.util
 import json
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -162,6 +162,7 @@ class Word:
     text: str
     confidence: float
     box: list[list[float]]  # four corner points, in the coordinates of the image actually read
+    page_box: list[list[float]] | None = None  # the same corners on the page as rendered (set by geometry.py)
 
 
 @dataclass
@@ -687,6 +688,7 @@ class PageResult:
     seconds: float
     warning: OcrStageError | None = None
     error: OcrStageError | None = None
+    applied: list[Step] = field(default_factory=list)  # the steps actually applied, with their parameters
 
 
 def process_page(page: Page, rules: dict[str, Any], engine: PaddleEngine) -> PageResult:
@@ -697,6 +699,7 @@ def process_page(page: Page, rules: dict[str, Any], engine: PaddleEngine) -> Pag
     against something outside this function (a cancelled run, and similar)."""
     to_read = page.bgr
     used_steps: list[str] = []
+    applied: list[Step] = []
     analysis: Analysis | None = None
     notes: list[str] = []
     warning: OcrStageError | None = None
@@ -707,18 +710,20 @@ def process_page(page: Page, rules: dict[str, Any], engine: PaddleEngine) -> Pag
         if steps:
             to_read = apply_plan(page.bgr, steps)
             used_steps = [step.name for step in steps]
+            applied = list(steps)
     except Exception as exc:
         # Enhancement is an optimisation, not a requirement: fall back to
         # reading the page exactly as it is, but keep the failure visible.
         warning = OcrStageError("enhance", "could not analyse or prepare this page; read it unprocessed instead",
                                 file=page.source.name, page=page.number, cause=exc)
-        to_read, used_steps, notes = page.bgr, [], []
+        to_read, used_steps, applied, notes = page.bgr, [], [], []
 
     try:
         reading = engine.read(to_read)
     except OcrStageError as exc:
         exc.file, exc.page = page.source.name, page.number
-        return PageResult(page.number, [], used_steps, analysis, notes, 0.0, warning=warning, error=exc)
+        return PageResult(page.number, [], used_steps, analysis, notes, 0.0, warning=warning, error=exc,
+                          applied=applied)
     except Exception as exc:
         # engine.read() is documented to raise only OcrStageError; this is a
         # safety net against an engine that does not honour that contract
@@ -726,6 +731,8 @@ def process_page(page: Page, rules: dict[str, Any], engine: PaddleEngine) -> Pag
         # single unanticipated failure here still cannot crash the caller.
         fallback = OcrStageError("ocr", "the OCR engine raised an unexpected error",
                                  file=page.source.name, page=page.number, cause=exc)
-        return PageResult(page.number, [], used_steps, analysis, notes, 0.0, warning=warning, error=fallback)
+        return PageResult(page.number, [], used_steps, analysis, notes, 0.0, warning=warning, error=fallback,
+                          applied=applied)
 
-    return PageResult(page.number, reading.words, used_steps, analysis, notes, reading.seconds, warning=warning)
+    return PageResult(page.number, reading.words, used_steps, analysis, notes, reading.seconds, warning=warning,
+                      applied=applied)

@@ -29,6 +29,11 @@ class SettingsTests(unittest.TestCase):
             "window_size": [100, True],
             "shutdown_wait_seconds": 0,
             "read_ahead": "yes",
+            "display_dpi": 0,
+            "page_gap_px": -1,
+            "highlight_colours": {"amount": "blue", "date": "#8250df", "pin": "#0f9d8a"},
+            "neighbour_alpha": 300,
+            "highlight_line_px": 0,
         }
         with tempfile.TemporaryDirectory() as folder:
             for key, value in cases.items():

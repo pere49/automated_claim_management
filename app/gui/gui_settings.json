@@ -34,5 +34,22 @@
   "shutdown_wait_seconds": 60,
   "_shutdown_wait_seconds": "On closing, how long to wait for a page that is mid-OCR to finish before the background thread is stopped by force.",
   "read_ahead": true,
-  "_read_ahead": "When nothing else needs the OCR engine, read the other files in the working folder in the background, in list order, so they are ready when opened. Results are identical either way; it only changes when reading happens. Opening a file takes over after the page being read finishes (up to one page's reading time)."
+  "_read_ahead": "When nothing else needs the OCR engine, read the other files in the working folder in the background, in list order, so they are ready when opened. Results are identical either way; it only changes when reading happens. Opening a file takes over after the page being read finishes (up to one page's reading time).",
+  "display_dpi": 200,
+  "_display_dpi": "Resolution pages are drawn at on screen. Lower than pdf_render_dpi to keep memory light; highlights stay exact because they are placed in the OCR's own page pixels.",
+  "page_gap_px": 40,
+  "_page_gap_px": "Space between pages in the continuous scroll view, in page pixels.",
+  "render_margin_pages": 1,
+  "_render_margin_pages": "Pages drawn beyond those on screen, above and below; pages further away are released from memory.",
+  "highlight_colours": {
+    "amount": "#1f6feb",
+    "date": "#8250df",
+    "pin": "#0f9d8a"
+  },
+  "_highlight_colours": "One colour per searched key (user decision: amount blue, date purple, PIN teal).",
+  "highlight_fill_alpha": 55,
+  "neighbour_alpha": 110,
+  "_alphas": "Opacity 0-255: fill inside a matched value; outline of its neighbouring segments on the same row.",
+  "highlight_line_px": 3,
+  "_highlight_line_px": "Outline width on screen, in screen pixels (stays the same at any zoom)."
 }

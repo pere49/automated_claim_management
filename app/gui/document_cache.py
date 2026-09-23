@@ -48,6 +48,7 @@ class PageReading:
 class CachedDocument:
     key: FileKey
     page_count: int | None = None           # None until the file has been opened or rendered
+    page_sizes: list[tuple[int, int]] | None = None   # (width, height) in page pixels, once opened
     pages: dict[int, PageReading] = field(default_factory=dict)   # 1-based page number -> reading
     failed: bool = False                    # the last attempt to read it could not open the file
 

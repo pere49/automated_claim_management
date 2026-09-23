@@ -47,6 +47,10 @@ class OcrIntegrationTests(unittest.TestCase):
         self.assertIn("SYNTHETIC SHOP", rows[0])
         self.assertTrue(rows[1].startswith("TOTAL") and rows[1].endswith("1,234.00"), rows[1])
         self.assertIn("05/08/2026", rows[2])
+        for w in result.words:  # every word also knows where it is on the page as displayed
+            self.assertIsNotNone(w.page_box)
+            if not result.applied:
+                self.assertEqual(w.page_box, w.box)
 
     def test_corrupt_pdf_raises_structured_load_error(self):
         with tempfile.TemporaryDirectory() as folder:
