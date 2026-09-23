@@ -1,0 +1,38 @@
+{
+  "_about": "Settings for the review window (app/gui/settings.py). Folder paths are relative to the project folder unless absolute.",
+  "working_folder": "images",
+  "_working_folder": "Where the file list looks for claim files. A placeholder for the eventual email-based intake (blueprint section 3).",
+  "file_extensions": [
+    ".pdf",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".heic",
+    ".heif"
+  ],
+  "_file_extensions": "Which files the left list shows: PDFs, and photos or screenshots (JPG, PNG, HEIC; an image is one page). Added images 2026-09-23 at the user's request. Excel is added at Stage C.",
+  "pdf_render_dpi": 300,
+  "_pdf_render_dpi": "Resolution PDF pages are rendered at, for OCR and for display alike (one coordinate frame for both). The OCR enhancement rules were measured on 300 dpi renders; change both together.",
+  "zoom_step": 1.15,
+  "min_zoom": 0.05,
+  "max_zoom": 8.0,
+  "_zoom": "Ctrl + mouse wheel on the page zooms by zoom_step per notch, within min_zoom..max_zoom of the page's actual size.",
+  "window_size": [
+    1600,
+    950
+  ],
+  "pane_widths": [
+    260,
+    820,
+    520
+  ],
+  "right_pane_heights": [
+    620,
+    260
+  ],
+  "_sizes": "Starting sizes in pixels; the officer can drag every divider.",
+  "shutdown_wait_seconds": 60,
+  "_shutdown_wait_seconds": "On closing, how long to wait for a page that is mid-OCR to finish before the background thread is stopped by force.",
+  "read_ahead": true,
+  "_read_ahead": "When nothing else needs the OCR engine, read the other files in the working folder in the background, in list order, so they are ready when opened. Results are identical either way; it only changes when reading happens. Opening a file takes over after the page being read finishes (up to one page's reading time)."
+}

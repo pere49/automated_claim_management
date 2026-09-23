@@ -1,0 +1,13 @@
+{
+  "_about": "Settings passed to the RapidOCR engine when it starts (app/ocr/reader.py). Only settings proven NOT to change what is read belong here: every entry must be checked for identical text and positions against the current settings on all test pages before it is adopted, and its memory cost measured (8 GB machine). Keys are RapidOCR's own dotted parameter names. Empty = RapidOCR's defaults.",
+  "rapidocr_params": {},
+  "_measured_2026_09_23": {
+    "_how": "28 pages in images/, prepared exactly as the application prepares them, read with each setting; clean baseline 10.4 s per page on this 4-core CPU.",
+    "rejected: EngineConfig.onnxruntime.enable_cpu_mem_arena true": "Identical output on 28/28 pages and 5-9% faster, but the process kept about 1.5 GB after four pages instead of about 0.3 GB. Too much memory for too little speed on an 8 GB machine.",
+    "rejected: Rec.rec_batch_num 16": "About 5% faster, but the text or positions changed on 17 of 28 pages (batching pads lines to a common width). Speed must never change what is read.",
+    "not adopted: EngineConfig.onnxruntime.intra_op_num_threads 4": "Identical output; no measurable gain over the default on this machine once measured without other load.",
+    "not adopted: two pages read at once, 2 threads each": "Identical output; about 22% more pages per minute overall, but each single page takes about 16 s instead of about 10 s. The officer waits on the page on screen, so this makes the wait they notice longer. Worth revisiting only for background read-ahead on a machine with more cores.",
+    "detection resolution (tools/ocr_resolution_trial)": "22 unique pages, 194 hand-checked values (amounts, dates, PINs/IDs). Current (detect at ~2000 px): 10.2 s/page, 186/194 found. Detect-only 1600: 8.1 s (21% faster), 186/194, but every page read slightly differently (about as many old misreads fixed as new ones made). Detect-only 1280: 6.5 s, 182/194. 1024: 5.4 s, 182/194. 800: 4.6 s, 169/194. Whole image (Global.max_side_len) 1600: 8.5 s, 185/194; 1280: 6.7 s, 183/194. User decision: keep the current setting. Note: RapidOCR ignores Det.limit_side_len on pages over 1500 px (its detector picks 2000 px), so a detection-only change needs an override of its detector sizing.",
+    "recognition from the full-resolution page (tools/ocr_resolution_trial)": "Detection unchanged; each text line cut from the 300 dpi page instead of RapidOCR's 2000 px copy. 11.1 vs 10.6 s per page, 186/194 found either way (2 recovered, 2 lost). No net gain; not adopted."
+  }
+}
