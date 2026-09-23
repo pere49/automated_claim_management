@@ -99,7 +99,7 @@ PASS / CAUTION / REVIEW (D13) · country not used; PIN = the claimant's, from a 
 
 - Windows 10, 4 cores, screen 1280×680 at 150 %. Python 3.13.4 in `.venv`. Key packages: PySide6-Essentials 6.11.2, rapidocr 3.9.2, onnxruntime 1.30.0, pymupdf 1.28.2, openpyxl 3.1.5 (already installed — Stage C needs no new library), numpy 2.5.3, pillow 12.3.0.
 - `images/` (git-ignored) now holds the user's **full claim files**: a cash claim sheet PDF and a card claim PDF (claim sheet + card statement + receipts), receipt bundles for two claim weeks, a 26-page Ethiopian receipts bundle (telebirr slips, a bank screenshot, ERCA receipts), and two .docx files (ignored by design). Real names and PINs appear in them — never copy them into committed files (a privacy sweep on 2026-09-23 replaced the one real PIN that had crept into examples with the fabricated `A012345678Z`).
-- Git: branch **`backend`** of `https://github.com/pere49/automated_claim_management.git`. Pushed: commit `4ca2920` (Stage A era). **Everything since — Stage B, the trials, today's docs — is uncommitted.** Ask the user whether to commit and push (never force). The older `blueprint.md` on `master` is superseded by `docs/blueprint.md`; retiring it is the user's call.
+- Git: branch **`backend`** of `https://github.com/pere49/automated_claim_management.git`. Pushed: `4ca2920` (Stage A era) and `f791e2b` (Stage B, the trials, the consolidated docs — 2026-09-23). Commit and push only when the user asks; never force; run the privacy sweep on staged files first. The older `blueprint.md` on `master` is superseded by `docs/blueprint.md`; retiring it is the user's call.
 
 ---
 
