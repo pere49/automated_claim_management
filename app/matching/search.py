@@ -21,7 +21,7 @@ from decimal import Decimal
 from typing import Any, Mapping
 
 from app.errors import StageError
-from app.matching.amount_search import amount_cores, find_amount
+from app.matching.amount_search import amount_cores, comparable_texts, find_amount
 from app.matching.date_search import find_date, text_cores
 from app.matching.dates import DateForms, date_forms
 from app.matching.found import CORRECTED, EXACT, POSSIBLE, Found
@@ -150,6 +150,21 @@ def search_page(page: PreparedPage, query: Query, rules: MatchingRules, forms: _
     return hits
 
 
+def amount_texts(page: PreparedPage, rules: MatchingRules) -> set[str]:
+    """Every amount text the finder compares on this page (for an index of pages by amount)."""
+    return comparable_texts(page.amounts, page.amount_cores, rules)
+
+
+def make_hit(page: PreparedPage, key: str, strength: str, row: int, segments: tuple[int, ...],
+             rules: MatchingRules) -> Hit:
+    """A Hit for a value found on `row` in these segments, with its neighbours on the same row."""
+    segs = page.rows[row].segments
+    n = rules.neighbours_each_side
+    first, last = min(segments), max(segments)
+    around = [i for i in range(max(0, first - n), min(len(segs), last + n + 1)) if i not in segments]
+    return Hit(key, strength, row, tuple(segs[i] for i in segments), tuple(segs[i] for i in around))
+
+
 def search_document(pages: Mapping[int, PreparedPage], query: Query, rules: MatchingRules) -> DocumentMatches:
     """Search every page. A page that fails is recorded, never raised."""
     result = DocumentMatches(query, {})
@@ -173,11 +188,4 @@ def _forms(query: Query, rules: MatchingRules) -> _Forms:
 
 
 def _hits(key: str, found: list[Found], page: PreparedPage, rules: MatchingRules) -> list[Hit]:
-    out = []
-    n = rules.neighbours_each_side
-    for f in found:
-        segs = page.rows[f.row].segments
-        first, last = min(f.segments), max(f.segments)
-        around = [i for i in range(max(0, first - n), min(len(segs), last + n + 1)) if i not in f.segments]
-        out.append(Hit(key, f.strength, f.row, tuple(segs[i] for i in f.segments), tuple(segs[i] for i in around)))
-    return out
+    return [make_hit(page, key, f.strength, f.row, f.segments, rules) for f in found]

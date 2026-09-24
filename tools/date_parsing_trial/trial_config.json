@@ -1,0 +1,117 @@
+{
+  "_about": "PROTOTYPE (tools/): the claim-sheet date trial. Fabricated claim sheets whose dates are written the many ways people write them; candidate reading rules are scored on how many dates they read correctly, read WRONG (the worst outcome) or leave for the officer. Not used by the application.",
+  "seed": 20260924,
+  "sheets": 4000,
+  "rows_per_sheet": [
+    1,
+    25
+  ],
+  "claim_span_days": [
+    1,
+    60
+  ],
+  "years": [
+    2025,
+    2027
+  ],
+  "month_names": {
+    "1": [
+      "Jan",
+      "January"
+    ],
+    "2": [
+      "Feb",
+      "February"
+    ],
+    "3": [
+      "Mar",
+      "March"
+    ],
+    "4": [
+      "Apr",
+      "April"
+    ],
+    "5": [
+      "May"
+    ],
+    "6": [
+      "Jun",
+      "June"
+    ],
+    "7": [
+      "Jul",
+      "July"
+    ],
+    "8": [
+      "Aug",
+      "August"
+    ],
+    "9": [
+      "Sep",
+      "Sept",
+      "September"
+    ],
+    "10": [
+      "Oct",
+      "October"
+    ],
+    "11": [
+      "Nov",
+      "November"
+    ],
+    "12": [
+      "Dec",
+      "December"
+    ]
+  },
+  "writer_styles": {
+    "excel_date_cell": 0.3,
+    "numeric_month_first": 0.18,
+    "numeric_day_first": 0.18,
+    "word_day_first": 0.12,
+    "word_month_first": 0.08,
+    "iso": 0.04,
+    "excel_serial_number": 0.03,
+    "mixed_words_and_numbers": 0.07,
+    "excel_locale_swapped": 0.1
+  },
+  "_writer_styles": "Share of sheets written in each style. mixed_words_and_numbers: one person, one order, some dates with month words and some without.",
+  "order_swapper_share": 0.06,
+  "_order_swapper_share": "Share of numeric sheets whose writer swaps day and month on some rows (inconsistent sheet).",
+  "swap_rate_within_swapper": 0.3,
+  "unsorted_share": 0.2,
+  "blank_date_rate": 0.04,
+  "pdf_source_share": 0.3,
+  "ocr_noise_rate": 0.03,
+  "_ocr_noise": "Sheets read from a PDF picture get OCR-like confusions (O for 0, l for 1, S for 5, a stray space) on this share of their dates.",
+  "receipt_found_rate": 0.9,
+  "receipt_coincidence_rate": 0.01,
+  "_receipts": "For receipt evidence: a row's true date is on its receipt with this probability; the swapped reading coincidentally appears on a receipt with the same amount with the coincidence rate.",
+  "max_claim_span_days": 92,
+  "_max_claim_span_days": "Chronology check: a reading that spreads the sheet's dates over more days than this is implausible for one claim.",
+  "excel_dotted_text_rate": 0.05,
+  "_excel": "excel_locale_swapped (added 2026-09-24 after a real workbook showed it): a writer typing into an Excel set to the other day/month order. excel_dotted_text_rate: share of cells in correct Excel sheets typed as dotted text dates, which Excel never converts.",
+  "processing_delay_days": [
+    [
+      0,
+      30,
+      0.55
+    ],
+    [
+      31,
+      60,
+      0.25
+    ],
+    [
+      61,
+      120,
+      0.15
+    ],
+    [
+      121,
+      365,
+      0.05
+    ]
+  ],
+  "_processing_delay_days": "How long after the last receipt the officer checks the claim: [from, to, share]. Claims are monthly; the owner's own July receipts were checked in September, so late checks are included."
+}

@@ -36,6 +36,18 @@ def find_pin(pin: str, rows: list[list[Token]], cores: list[list[str]], rules: M
     return found
 
 
+def pin_matches(token: str, pin: str, rules: MatchingRules) -> str | None:
+    """EXACT or CORRECTED when `token` is `pin` as printed, with the finder's
+    own tolerance (positional repair, one look-alike character); else None."""
+    pin_u = normalise_pin(pin)
+    return _compare(token.upper(), pin_u, _format_of(pin_u, rules), rules)
+
+
+def is_pin_shaped(token: str, rules: MatchingRules) -> bool:
+    """The token has a configured PIN format (e.g. letter, 9 digits, letter)."""
+    return _format_of(token.upper(), rules) is not None
+
+
 def _compare(core: str, pin_u: str, fmt: str | None, rules: MatchingRules) -> str | None:
     if len(core) > len(pin_u):
         head, tail = core[: -len(pin_u)], core[-len(pin_u):]

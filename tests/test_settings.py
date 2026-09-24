@@ -16,7 +16,9 @@ class SettingsTests(unittest.TestCase):
     def test_shipped_settings_load(self):
         settings = load_settings()
         self.assertEqual(settings.working_folder, paths.PROJECT_ROOT / "images")
-        self.assertEqual(settings.file_extensions, (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif"))
+        self.assertEqual(settings.file_extensions, (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif", ".xlsx", ".xlsm"))
+        self.assertEqual(len(settings.right_pane_heights), 3)
+        self.assertTrue(settings.tour_auto_start)
 
     def test_invalid_values_rejected(self):
         good = json.loads(DEFAULT_SETTINGS.read_text(encoding="utf-8"))
@@ -34,6 +36,10 @@ class SettingsTests(unittest.TestCase):
             "highlight_colours": {"amount": "blue", "date": "#8250df", "pin": "#0f9d8a"},
             "neighbour_alpha": 300,
             "highlight_line_px": 0,
+            "right_pane_heights": [600, 200],
+            "tour": {"auto_start": True, "green_ms": 0, "yellow_ms": 100},
+            "cell_colours": {"green": "#c6efce", "yellow": "yellow", "red": "#ffc7ce"},
+            "company_pin_key": " ",
         }
         with tempfile.TemporaryDirectory() as folder:
             for key, value in cases.items():

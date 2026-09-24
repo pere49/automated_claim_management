@@ -1,0 +1,57 @@
+{
+  "_about": "PROTOTYPE (tools/): settings for the total-anchor and different-buyer-PIN trial. Generic receipt vocabulary, not tuned to the test pages.",
+  "pairs": "tools/total_anchor_trial/private/pairs.json",
+  "total_labels": [
+    "total",
+    "grand total",
+    "total amount",
+    "amount due",
+    "total due",
+    "net amount",
+    "net total",
+    "settled amount",
+    "total paid",
+    "total paid amount",
+    "amount paid",
+    "to pay",
+    "balance due",
+    "total payable",
+    "amount payable"
+  ],
+  "tender_labels": [
+    "cash",
+    "tendered",
+    "tender",
+    "change",
+    "cash tendered",
+    "amount tendered",
+    "cash given",
+    "mpesa",
+    "m-pesa",
+    "card",
+    "visa",
+    "mastercard",
+    "discount",
+    "before discount"
+  ],
+  "_labels": "A label counts when its words appear in order as whole words on the amount's printed row. tender_labels: rows that are NOT the paid total (cash handed over, change, card, and a total before discount) — added 'discount' after the first run showed 'total before discount' accepted as a total.",
+  "buyer_pin_labels": [
+    "buyer pin",
+    "buyer's pin",
+    "buyer kra pin",
+    "customer pin",
+    "customer kra pin",
+    "client pin",
+    "purchaser pin",
+    "pin of buyer",
+    "buyer tin",
+    "customer tin"
+  ],
+  "_buyer_pin_labels": "A PIN-shaped value on the same row after one of these labels is the buyer's PIN.",
+  "_total_labels": "Not 'subtotal': a pre-tax subtotal is not the receipt's total either.",
+  "mobile_money_labels": [
+    "sent to",
+    "paid to"
+  ],
+  "_mobile_money_labels": "Mobile-money messages state the paid amount as 'Ksh200.00 sent to NAME' / 'paid to SHOP'."
+}

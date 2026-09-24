@@ -23,7 +23,7 @@ class GuiSettings:
     max_zoom: float
     window_size: tuple[int, int]
     pane_widths: tuple[int, int, int]
-    right_pane_heights: tuple[int, int]
+    right_pane_heights: tuple[int, int, int]
     shutdown_wait_seconds: int
     read_ahead: bool
     display_dpi: int
@@ -33,6 +33,14 @@ class GuiSettings:
     highlight_fill_alpha: int
     neighbour_alpha: int
     highlight_line_px: int
+    tour_auto_start: bool
+    tour_green_ms: int
+    tour_yellow_ms: int
+    status_colours: dict[str, str]
+    cell_colours: dict[str, str]
+    sheet_column_max_px: int
+    company_pin_file: Path
+    company_pin_key: str
 
 
 def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
@@ -43,7 +51,8 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
         "window_size": list, "pane_widths": list, "right_pane_heights": list,
         "shutdown_wait_seconds": int, "read_ahead": bool, "display_dpi": int, "page_gap_px": int,
         "render_margin_pages": int, "highlight_colours": dict, "highlight_fill_alpha": int, "neighbour_alpha": int,
-        "highlight_line_px": int,
+        "highlight_line_px": int, "tour": dict, "status_colours": dict, "cell_colours": dict, "sheet_column_max_px": int,
+        "company_pin_file": str, "company_pin_key": str,
     })
 
     def fail(message: str) -> StageError:
@@ -73,8 +82,21 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
             raise fail(f"'{key}' must be between 0 and 255")
     if d["highlight_line_px"] < 1:
         raise fail("'highlight_line_px' must be at least 1")
+    tour = d["tour"]
+    if not (isinstance(tour.get("auto_start"), bool) and all(
+            isinstance(tour.get(k), int) and not isinstance(tour.get(k), bool) and tour[k] > 0
+            for k in ("green_ms", "yellow_ms"))):
+        raise fail("'tour' must hold auto_start (true/false) and green_ms / yellow_ms (milliseconds above zero)")
+    for key, names in (("status_colours", {"green", "yellow", "red", "grey"}), ("cell_colours", {"green", "yellow", "red"})):
+        if set(d[key]) != names or not all(isinstance(c, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", c)
+                                           for c in d[key].values()):
+            raise fail(f"'{key}' must give {', '.join(sorted(names))} each a colour like \"#1a7f37\"")
+    if d["sheet_column_max_px"] < 40:
+        raise fail("'sheet_column_max_px' must be at least 40")
+    if not d["company_pin_file"].strip() or not d["company_pin_key"].strip():
+        raise fail("'company_pin_file' and 'company_pin_key' must not be empty")
     sizes = {}
-    for key, count in (("window_size", 2), ("pane_widths", 3), ("right_pane_heights", 2)):
+    for key, count in (("window_size", 2), ("pane_widths", 3), ("right_pane_heights", 3)):
         value = d[key]
         if len(value) != count or not all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in value):
             raise fail(f"'{key}' must be {count} positive whole numbers")
@@ -92,4 +114,8 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
         display_dpi=d["display_dpi"], page_gap_px=d["page_gap_px"], render_margin_pages=d["render_margin_pages"],
         highlight_colours=dict(colours), highlight_fill_alpha=d["highlight_fill_alpha"],
         neighbour_alpha=d["neighbour_alpha"], highlight_line_px=d["highlight_line_px"],
+        tour_auto_start=tour["auto_start"], tour_green_ms=tour["green_ms"], tour_yellow_ms=tour["yellow_ms"],
+        status_colours=dict(d["status_colours"]), cell_colours=dict(d["cell_colours"]),
+        sheet_column_max_px=d["sheet_column_max_px"],
+        company_pin_file=paths.resolve(d["company_pin_file"]), company_pin_key=d["company_pin_key"].strip(),
     )

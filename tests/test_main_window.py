@@ -79,8 +79,8 @@ class WindowTestCase(unittest.TestCase):
 
 class FileListTests(WindowTestCase):
     def test_lists_only_claim_documents_by_name(self):
-        w = self.window()  # Excel (until Stage C), text files and folders are not listed
-        self.assertEqual(w.files.file_names(), ["A.PDF", "b.pdf", "photo.jpg"])
+        w = self.window()  # text files and folders are not listed; Excel claim sheets are (Stage C)
+        self.assertEqual(w.files.file_names(), ["A.PDF", "b.pdf", "claim.xlsx", "photo.jpg"])
 
     def test_missing_working_folder_is_an_error_not_a_crash(self):
         w = self.window(folder=self.folder / "does-not-exist")

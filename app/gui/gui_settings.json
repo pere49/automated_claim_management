@@ -8,9 +8,11 @@
     ".jpeg",
     ".png",
     ".heic",
-    ".heif"
+    ".heif",
+    ".xlsx",
+    ".xlsm"
   ],
-  "_file_extensions": "Which files the left list shows: PDFs, and photos or screenshots (JPG, PNG, HEIC; an image is one page). Added images 2026-09-23 at the user's request. Excel is added at Stage C.",
+  "_file_extensions": "Which files the left list shows: PDFs, photos or screenshots (JPG, PNG, HEIC; an image is one page), and from Stage C Excel claim sheets (.xlsx, .xlsm; old .xls files are refused with a message).",
   "pdf_render_dpi": 300,
   "_pdf_render_dpi": "Resolution PDF pages are rendered at, for OCR and for display alike (one coordinate frame for both). The OCR enhancement rules were measured on 300 dpi renders; change both together.",
   "zoom_step": 1.15,
@@ -22,15 +24,16 @@
     950
   ],
   "pane_widths": [
-    260,
-    820,
-    520
+    220,
+    640,
+    700
   ],
   "right_pane_heights": [
-    620,
-    260
+    70,
+    480,
+    220
   ],
-  "_sizes": "Starting sizes in pixels; the officer can drag every divider.",
+  "_sizes": "Starting sizes in pixels; the officer can drag every divider. right_pane_heights: the status strip (kept small), the claim sheet (most of the height), the OCR text / Search tabs (a little smaller than the Stage B search panel) — owner, D32.",
   "shutdown_wait_seconds": 60,
   "_shutdown_wait_seconds": "On closing, how long to wait for a page that is mid-OCR to finish before the background thread is stopped by force.",
   "read_ahead": true,
@@ -51,5 +54,28 @@
   "neighbour_alpha": 110,
   "_alphas": "Opacity 0-255: fill inside a matched value; outline of its neighbouring segments on the same row.",
   "highlight_line_px": 3,
-  "_highlight_line_px": "Outline width on screen, in screen pixels (stays the same at any zoom)."
+  "_highlight_line_px": "Outline width on screen, in screen pixels (stays the same at any zoom).",
+  "tour": {
+    "auto_start": true,
+    "green_ms": 1200,
+    "yellow_ms": 2600
+  },
+  "_tour": "The Auto tour (D31): starts by itself when a claim has been checked; lingers green_ms on a green amount, yellow_ms on a yellow or red one (its reason is shown).",
+  "status_colours": {
+    "green": "#1a7f37",
+    "yellow": "#bf8700",
+    "red": "#cf222e",
+    "grey": "#8c959f"
+  },
+  "cell_colours": {
+    "green": "#c6efce",
+    "yellow": "#fff2a8",
+    "red": "#ffc7ce"
+  },
+  "_colours": "status_colours: the dots of the status strip and the grand totals; cell_colours: the claimed amounts on the sheet (owner: green verified, yellow manual check, red one receipt claimed twice). Receipt highlights keep highlight_colours.",
+  "sheet_column_max_px": 130,
+  "_sheet_column_max_px": "Widest a claim-sheet column starts (long descriptions are cut, shown in full on hover), so Date, the expense columns and Total fit together.",
+  "company_pin_file": ".env",
+  "company_pin_key": "COMPANY_PINS",
+  "_company_pin": "Where the company's Kenyan PIN is kept (D23): a git-ignored file at the project root, KEY=value lines; the first PIN listed is searched. Never shown, logged or committed."
 }

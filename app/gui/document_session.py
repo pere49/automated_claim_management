@@ -14,6 +14,11 @@ always takes over from read-ahead (after the page being read finishes).
 A file whose reading ran to an end (even with failed pages) is not read
 ahead again this run, so a broken file is never retried in a loop; opening
 it retries its failed pages. An interrupted read-ahead is resumed later.
+
+Background requests (Stage C): a scanned claim sheet must be read by OCR
+while the receipts stay open. request_reading(path) puts it before any
+read-ahead (read-ahead switched on or not); document_done(path) says when a
+file's reading has run to an end, whichever file it is.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ class DocumentSession(QObject):
     finished = Signal(str)          # FINISHED | CANCELLED | FAILED, for the open document
     file_state_changed = Signal(object, str)   # path, short state text for the file list
     problem = Signal(object, str)   # StageError, ERROR | WARNING
+    document_done = Signal(object)  # path of any file whose reading ran to an end (even with failed pages)
 
     _warm_up = Signal()
     _read = Signal(int, str, object)
@@ -52,6 +58,8 @@ class DocumentSession(QObject):
         self._jobs: dict[int, CachedDocument] = {}
         self._running: CachedDocument | None = None   # document the latest job is reading
         self._candidates: list[Path] = []
+        self._requested: list[Path] = []                # read in the background before any read-ahead
+        self._awaited: set[Path] = set()                # requested and not yet read to an end
         self._read_ahead_done: set = set()             # FileKeys whose reading ran to an end this run
         self._stopped = False
 
@@ -138,6 +146,23 @@ class DocumentSession(QObject):
             self.file_state_changed.emit(path, self._state_text(self.cache.get(path)))
         self._maybe_read_ahead()
 
+    def request_reading(self, path: Path) -> None:
+        """Read this file in the background (before any read-ahead), without
+        showing it. document_done(path) follows — at once if it is already read."""
+        doc = self.cache.get(path)
+        if doc is not None and doc.complete and not self._pages_to_read(doc):
+            self.document_done.emit(path)
+            return
+        self._awaited.add(path)
+        if path not in self._requested:
+            self._requested.insert(0, path)
+        self._read_ahead_done.discard(doc.key if doc else None)
+        self._maybe_read_ahead()
+
+    def cached(self, path: Path) -> CachedDocument | None:
+        """The readings held for this file, if any."""
+        return self.cache.get(path)
+
     @property
     def page_sizes(self) -> list[tuple[int, int]]:
         return list(self.current.page_sizes or []) if self.current else []
@@ -184,7 +209,21 @@ class DocumentSession(QObject):
         self.file_state_changed.emit(doc.path, self._state_text(doc))
 
     def _maybe_read_ahead(self) -> None:
-        if not self._settings.read_ahead or self._running is not None or self._stopped:
+        if self._running is not None or self._stopped:
+            return
+        while self._requested:
+            path = self._requested.pop(0)
+            try:
+                doc = self.cache.get_or_create(file_key(path))
+            except StageError as exc:
+                self.problem.emit(exc, ERROR)
+                continue
+            if doc.page_count is not None and not self._pages_to_read(doc):
+                self.document_done.emit(path)
+                continue
+            self._start_job(doc, priority=0)
+            return
+        if not self._settings.read_ahead:
             return
         for path in self._candidates:
             try:
@@ -234,6 +273,11 @@ class DocumentSession(QObject):
         self.file_state_changed.emit(doc.path, self._state_text(doc))
         if latest and doc is self.current:
             self.finished.emit(outcome)
+        if outcome == CANCELLED and doc.path in self._awaited and doc.path not in self._requested:
+            self._requested.insert(0, doc.path)      # a requested reading interrupted: it comes back first
+        if outcome != CANCELLED:
+            self._awaited.discard(doc.path)
+            self.document_done.emit(doc.path)
         if latest:
             self._maybe_read_ahead()
 

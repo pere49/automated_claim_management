@@ -104,6 +104,25 @@ class SearchController(QObject):
         self._prepare(number)
         self.refresh()
 
+    def prepared_pages(self) -> tuple[dict[int, PreparedPage], list[int]]:
+        """Every read page of the open document, prepared (the ones already
+        prepared are reused), and the pages with no usable reading."""
+        session = self._session
+        if session.path != self._path:
+            self._prepared, self._path = {}, session.path
+        pages, unread = {}, []
+        for number in range(1, session.page_count + 1):
+            prepared = self._prepare(number)
+            if prepared is None:
+                unread.append(number)
+            else:
+                pages[number] = prepared
+        return pages, unread
+
+    @property
+    def rules(self) -> MatchingRules | None:
+        return self._rules
+
     def clear(self) -> None:
         self._query = None
         self.cleared.emit()

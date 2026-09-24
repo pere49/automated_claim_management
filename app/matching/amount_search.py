@@ -59,6 +59,16 @@ def find_amount(forms: AmountForms, rows: list[list[Token]], cores: list[list[Co
     return found
 
 
+def comparable_texts(rows: list[list[Token]], cores: list[list[Core]], rules: MatchingRules) -> set[str]:
+    """Every text on the page that find_amount compares with an amount's forms:
+    each token's core, and each faded-decimal join. A claimed amount can only
+    be found on a page holding one of its forms here (an index, built once)."""
+    out = {core for row in cores for core, _ in row}
+    for tokens in rows:
+        out.update(trim(text, rules)[0] for _, text in _faded(tokens, rules))
+    return out
+
+
 def trim(token: str, rules: MatchingRules) -> Core:
     """The token's core, and whether a currency word or no-cents ending was attached."""
     if not any(c.isdigit() for c in token):

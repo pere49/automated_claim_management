@@ -1,0 +1,16 @@
+{
+  "_about": "Stage C timing trial settings (tools/stage_c_timing). Prototype only.",
+  "readings": "outputs/search_criteria_trial/readings_claims.json",
+  "answer_key": "tools/search_criteria_trial/private/ground_truth_claims.json",
+  "document": "reciept for july (002).pdf",
+  "_document": "The receipts PDF whose saved OCR readings are timed; larger documents are made from copies of its pages with every digit changed.",
+  "sizes": [26, 100, 250, 500],
+  "repeats": 5,
+  "_repeats": "Each step is run this many times and its median kept (steps slower than slow_step_seconds run once).",
+  "slow_step_seconds": 2.0,
+  "fake_pin": "A012345678Z",
+  "sheet_rows": 44,
+  "sheet_columns": 14,
+  "_sheet": "The made-up Excel claim sheet: the size of the sample sheet (44 x 14 cells).",
+  "seed": 20260924
+}

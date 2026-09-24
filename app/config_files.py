@@ -21,9 +21,10 @@ _TYPE_NAMES = {int: "a whole number", float: "a number", str: "text", list: "a l
                dict: "a section", bool: "true or false"}
 
 
-def read_json_config(path: Path, required: dict[str, type | tuple[type, ...]]) -> dict[str, Any]:
+def read_json_config(path: Path | str, required: dict[str, type | tuple[type, ...]]) -> dict[str, Any]:
     """Load `path` and check that every key in `required` is present with the
     stated type. Raises StageError(stage="config") on any problem."""
+    path = Path(path)
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:

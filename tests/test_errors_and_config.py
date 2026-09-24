@@ -77,6 +77,10 @@ class ReadJsonConfigTests(unittest.TestCase):
     def test_true_false_is_not_a_number(self):
         self.assertConfigError(self.write('{"a": true}'), {"a": (int, float)}, "'a' must be")
 
+    def test_a_path_given_as_text_works_and_fails_the_same_way(self):
+        self.assertEqual(read_json_config(str(self.write('{"a": 1}')), {"a": int})["a"], 1)
+        self.assertConfigError(str(self.folder / "nope.json"), {}, "not found")
+
 
 if __name__ == "__main__":
     unittest.main()

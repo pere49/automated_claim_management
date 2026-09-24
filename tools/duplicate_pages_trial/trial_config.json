@@ -1,0 +1,26 @@
+{
+  "_about": "Duplicate-page trial settings (tools/duplicate_pages_trial). Prototype only: the application gets its own config when the check is built.",
+  "word_min_length": 3,
+  "text_similarity_min": 0.90,
+  "text_thresholds_compared": [0.85, 0.90, 0.95],
+  "_text": "Check 'text': two pages whose words (3+ characters, lower case) overlap by at least text_similarity_min (shared / all) are the same scan.",
+  "amount_min": 1,
+  "_moment": "Check 'moment': same printed date + same printed time + a shared amount of at least amount_min.",
+  "reference_min_length": 8,
+  "reference_min_digits": 6,
+  "shared_references_min": 2,
+  "_references": "Check 'references': reference-like words (letters/digits, reference_min_length+ long, reference_min_digits+ digits, not an amount or a date) printed on these two pages and on no other page of the document; flag when at least shared_references_min of them are shared.",
+  "invoice_labels": [
+    "invoice no", "invoice number", "invoice nr", "invoice #", "inv no", "cu invoice no",
+    "receipt no", "receipt number", "receipt #", "rct no", "bill no", "bill number",
+    "transaction id", "transaction no", "transaction number", "trans id", "txn id",
+    "reference no", "reference number", "ref no", "order no", "ticket no", "voucher no", "folio no"
+  ],
+  "invoice_value_from": "reading_order",
+  "invoice_look_ahead_segments": 1,
+  "invoice_value_min_length": 5,
+  "invoice_value_min_digits": 5,
+  "invoice_value_tokens": 2,
+  "invoice_next_row": false,
+  "_invoice": "Check 'invoice': the value printed after an invoice-type label: the first of the next invoice_value_tokens words that is invoice_value_min_length+ letters/digits with invoice_value_min_digits+ digits, not an amount or date. invoice_value_from 'reading_order' takes those words from the label's segment and the next invoice_look_ahead_segments segments in OCR order; 'row' takes them from the label's printed row, else (invoice_next_row) the next row's first word. Flag two pages printing the same value. Labels are generic receipt vocabulary, not tuned to the test pages."
+}
