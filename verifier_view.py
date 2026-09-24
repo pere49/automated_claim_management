@@ -106,10 +106,10 @@ class VerifierView(ft.Container):
         self.left_zoom_out = ft.IconButton(ft.Icons.ZOOM_OUT, on_click=lambda _: self._zoom_left(-0.2))
 
         DUMMY_IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-        self.left_image = ft.Image(src=DUMMY_IMG, fit=ft.BoxFit.CONTAIN, expand=True)
+        self.left_image = ft.Image(src=DUMMY_IMG, fit=ft.BoxFit.CONTAIN, width=400, height=600, expand=False)
         self.left_placeholder = ft.Text("No Claim PDF found", color=ft.Colors.OUTLINE)
 
-        left_pane = ft.Container(
+        left_pane = ft.Container(width=420, height=650, expand=False,
             content=ft.Column(
                 [
                     ft.Container(
@@ -146,7 +146,7 @@ class VerifierView(ft.Container):
                 ],
                 expand=True
             ),
-            expand=True
+
         )
 
         # 3. RIGHT PANE: Bank Statement / Receipts Viewer
