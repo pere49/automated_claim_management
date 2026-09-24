@@ -1,10 +1,11 @@
 """The records a claim sheet is read into (blueprint section 4).
 
-A ClaimFile holds one ClaimSheet per claim table found (an Excel tab, or a
-PDF page). Its rows hold ClaimItems: one per non-zero amount in an expense
-column, paired with the row's date. Reading problems are attached to the
-row or item they concern — in plain words, never with the values
-themselves — so one bad cell never stops the sheet.
+A ClaimFile holds one ClaimSheet per claim table found (a PDF page). Its
+rows hold ClaimItems: one per non-zero amount in an expense column, paired
+with the row's date. Reading problems are attached to the row or item they
+concern — in plain words, never with the values themselves — so one bad
+cell never stops the sheet. A SheetPlace says where the table sits on its
+page, so the window can show the sheet as the document itself (D39).
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ EMPTY, UNREADABLE, ONE_MEANING = "empty", "unreadable", "one meaning"
 SHEET_ORDER, NO_FUTURE, CLAIM_PERIOD, UNDECIDED = "sheet order", "no future date", "claim period", "undecided"
 
 # what kind of file a claim sheet came from
-EXCEL, PDF_TEXT, SCANNED = "excel", "pdf text", "scanned"
+PDF_TEXT, SCANNED = "pdf text", "scanned"
 
 
 @dataclass(frozen=True)
@@ -66,9 +67,40 @@ class SheetColumns:
     total: int | None
 
 
+@dataclass(frozen=True)
+class Box:
+    """A rectangle on the claim page, in fractions of the page's width and height (0..1)."""
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+
+@dataclass
+class SheetPlace:
+    """Where the claim table sits on its page, in fractions of the page (0..1)."""
+    page: int                                        # 1-based page of the claim file
+    printed: Box                                     # everything printed on the page (the view crops to it)
+    rows: dict[int, tuple[float, float]]             # grid row -> (top, bottom)
+    columns: dict[int, tuple[float, float]]          # grid column -> (left, right)
+
+    def cell(self, row: int, column: int) -> Box | None:
+        if row not in self.rows or column not in self.columns:
+            return None
+        (top, bottom), (left, right) = self.rows[row], self.columns[column]
+        return Box(left, top, right, bottom)
+
+    def row_band(self, row: int) -> Box | None:
+        """The row across the whole table."""
+        if row not in self.rows or not self.columns:
+            return None
+        top, bottom = self.rows[row]
+        return Box(min(a for a, _ in self.columns.values()), top, max(b for _, b in self.columns.values()), bottom)
+
+
 @dataclass
 class ClaimSheet:
-    name: str                           # the Excel tab's name, or "page N" of a PDF
+    name: str                           # "page N" of the claim file
     grid: list[list[object]]            # every cell as found (Excel values, or text from a PDF)
     header_row: int                     # grid row of the header
     first_data_row: int
@@ -80,6 +112,7 @@ class ClaimSheet:
     currency: str | None
     row_numbers: list[int]              # grid row -> the sheet's own row number
     problems: list[str] = field(default_factory=list)
+    place: SheetPlace | None = None     # where the table sits on its page (None: not known)
 
     @property
     def items(self) -> list[ClaimItem]:
@@ -89,7 +122,7 @@ class ClaimSheet:
 @dataclass
 class ClaimFile:
     path: Path
-    kind: str                           # EXCEL | PDF_TEXT | SCANNED
+    kind: str                           # PDF_TEXT | SCANNED
     sheets: list[ClaimSheet]
     active: int                         # the sheet to show first
-    skipped: list[str] = field(default_factory=list)   # tabs / pages without a claim table
+    skipped: list[str] = field(default_factory=list)   # pages without a claim table

@@ -2,6 +2,8 @@
 
 The header row is the first row (within header_search_rows) that itself
 holds the date header and at least min_expense_columns expense column names
+— the claimed amounts are every column from the first to the last expense
+column named in expense_range, whatever the ones in between are called (D40)
 (the form's top line "Name … Date …" is ruled too, but holds no expense
 names). Under it, a small header block — rows whose filled cells are all
 words or ledger codes (the form puts "Vehicle Fuel" and codes like 4740150
@@ -98,7 +100,13 @@ def _expense_columns(header: list[object], date_col: int, rules: ClaimRules) -> 
             if c != date_col and c not in found and set(column.words) <= words[c]:
                 found[c] = column.name
                 break
-    return found
+    where = {name: c for c, name in found.items()}
+    first, last = (where.get(name) for name in rules.expense_range)
+    if first is not None and last is not None and first < last:
+        for c in range(first, last + 1):
+            if c != date_col and c not in found:
+                found[c] = " ".join(str(header[c]).split()) if norm(header[c]) else f"column {c + 1}"
+    return dict(sorted(found.items()))
 
 
 def _end(grid: list[list[object]], first: int, columns: SheetColumns, rules: ClaimRules) -> tuple[int, int | None]:

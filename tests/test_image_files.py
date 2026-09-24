@@ -76,7 +76,8 @@ class ImageFileTests(unittest.TestCase):
         w.files.file_chosen.emit(self.folder / "shot.png")
         self.assertTrue(wait_until(lambda: not w.session.busy))
         self.assertEqual(w.page_pane.position_text, "Page 1 of 1")
-        self.assertTrue(w.ocr_panel.text.startswith("TOTAL    100.00\nTHANK YOU"))
+        rows = "\n".join(row.text for row in w.session.reading(1).rows)
+        self.assertTrue(rows.startswith("TOTAL    100.00\nTHANK YOU"))
         self.assertEqual(w.files.state_of("shot.png"), "read")
 
     @unittest.skipUnless(heic_supported(), "this Pillow/pillow-heif build cannot write HEIC")

@@ -1,11 +1,11 @@
 """ClaimSession: the claim sheet and its receipts, checked together (Stage C).
 
-The two slots: the claim sheet (a file read by app/claims — an Excel file or
-a text PDF at once, a scanned sheet after OCR has read it in the background)
+The two slots: the claim sheet (a file read by app/claims — a text PDF at
+once, a scanned sheet after OCR has read it in the background)
 and the receipts (the document open in the viewer). When both are ready —
 the receipts read to the end, the sheet read — every claimed amount is
 checked at once (app/checking): the PIN scan, the repeated pages, the
-pairing, the verdicts, the totals. Changing the sheet tab searches again;
+pairing, the verdicts, the totals. Changing the sheet tab checks it afresh;
 flipping the PIN switch only decides again. Opening other receipts puts the
 PIN switch back to what the scan says.
 
@@ -35,10 +35,10 @@ class ClaimSession(QObject):
     waiting = Signal(str)                 # what the check is waiting for, in plain words
     problem = Signal(object, str)         # StageError, ERROR | WARNING
 
-    def __init__(self, session, search, settings: GuiSettings, today: Callable[[], date] = date.today,
+    def __init__(self, session, pages, settings: GuiSettings, today: Callable[[], date] = date.today,
                  parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._session, self._search, self._settings, self._today = session, search, settings, today
+        self._session, self._pages, self._settings, self._today = session, pages, settings, today
         self._claim_rules = self._checking_rules = None
         self._pin: str | None = None
         self.sheet_path: Path | None = None
@@ -76,7 +76,7 @@ class ClaimSession(QObject):
 
     @property
     def available(self) -> bool:
-        return None not in (self._claim_rules, self._checking_rules, self._search.rules)
+        return None not in (self._claim_rules, self._checking_rules, self._pages.rules)
 
     @property
     def sheet(self):
@@ -87,7 +87,7 @@ class ClaimSession(QObject):
         return self._pin is not None
 
     def is_claim_sheet(self, path: Path) -> bool:
-        """An Excel file, or a PDF whose text holds a claim table (a scanned
+        """A PDF whose text holds a claim table (a scanned
         sheet is only known as one when the officer says so)."""
         return self._claim_rules is not None and looks_like_claim_sheet(path, self._claim_rules)
 
@@ -133,7 +133,7 @@ class ClaimSession(QObject):
         if self.claim is None:
             return
         if not self.available:
-            self._not_checked("The claim cannot be checked: the checking or search rules could not be loaded — "
+            self._not_checked("The claim cannot be checked: the checking or matching rules could not be loaded — "
                               "see the Errors tab.")
             return
         session = self._session
@@ -155,12 +155,12 @@ class ClaimSession(QObject):
         try:
             key = (session.path, session.pages_read())
             if self._facts is None or self._facts_for != key:
-                pages, unread = self._search.prepared_pages()
+                pages, unread = self._pages.prepared_pages()
                 self._facts = analyse_receipts(pages, session.page_count, unread, self._pin, self._checking_rules,
-                                               self._search.rules)
+                                               self._pages.rules)
                 self._facts_for, self._findings = key, None
             if self._findings is None:
-                self._findings = find_all(self.sheet, self._facts, self._pin, self._search.rules)
+                self._findings = find_all(self.sheet, self._facts, self._pin, self._pages.rules)
             required = self._pin is not None and (bool(self._facts.pin_pages) if self.pin_switch is None
                                                    else self.pin_switch)
             self.result = decide(self.sheet, self._findings, self._facts, required)

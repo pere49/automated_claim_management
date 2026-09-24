@@ -2,9 +2,10 @@
 
 Each claimed amount gets an ItemResult: the system finding (PASS / CAUTION /
 REVIEW — never a plain true or false), the colour the officer sees (green /
-yellow / red), the page it was paired with (or the nearest candidate to
-show), a reason code and a plain-words detail. The detail may name amounts,
-dates and pages: it is for the window only, never for logs or errors.
+yellow / red, rule B — D34), the receipt page linked to it (D35), what does
+not match there, a reason code and a plain-words detail. Each receipt page
+gets a PageResult: its badge. Details and badge lines may name amounts,
+dates and pages: they are for the window only, never for logs or errors.
 """
 
 from __future__ import annotations
@@ -35,6 +36,11 @@ ALREADY_PAIRED = "receipt already paired"
 REPEAT_COPY = "receipt is a repeat"
 DOUBLE_CLAIM = "one receipt, two claims"
 
+# what a receipt page shows wrong for its claimed amount (D34, D35); the words and colours are in checking_rules.json
+P_AMOUNT, P_DATE, P_PIN, P_OTHER_BUYER, P_REPEATED, P_UNREADABLE, P_NO_RECEIPT = (
+    "amount", "date", "pin", "other_buyer", "repeated", "unreadable", "no_receipt")
+PROBLEMS = (P_AMOUNT, P_DATE, P_PIN, P_OTHER_BUYER, P_REPEATED, P_UNREADABLE, P_NO_RECEIPT)   # badge order
+
 
 @dataclass
 class ItemResult:
@@ -46,6 +52,18 @@ class ItemResult:
     reason: str                          # a reason code above
     detail: str                          # plain words, for the window only
     hits: list = field(default_factory=list)    # app.matching Hits to highlight on `page`
+    problems: tuple[str, ...] = ()       # P_* keys; empty when green
+    lines: tuple[str, ...] = ()          # the badge lines for this amount ("Amount 320.00 ≠ 330.00")
+
+
+@dataclass
+class PageResult:
+    """One receipt page's badge (D35)."""
+    page: int
+    colour: str                          # GREEN | YELLOW | RED
+    problems: tuple[str, ...]
+    lines: tuple[str, ...]               # what the badge says, one line each
+    item: int | None                     # the claimed amount linked to this page
 
 
 @dataclass
@@ -61,7 +79,9 @@ class Totals:
 @dataclass
 class Status:
     colour: str
-    text: str
+    text: str                            # the few words shown large
+    detail: str = ""                     # longer, for the tooltip
+    note: str = ""                       # one small line under the words (D42), e.g. "4,570.00 of 4,900.00"
 
 
 @dataclass
@@ -75,3 +95,5 @@ class ClaimCheck:
     verification: Status
     pin: Status
     repeated_pages: Status
+    total: Status                        # the one Total status (D37)
+    pages: dict[int, PageResult] = field(default_factory=dict)

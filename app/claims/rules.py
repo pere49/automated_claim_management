@@ -21,6 +21,7 @@ class ExpenseColumn:
 class ClaimRules:
     date_headers: frozenset[str]
     expense_columns: tuple[ExpenseColumn, ...]
+    expense_range: tuple[str, str]           # names of the first and last expense columns
     min_expense_columns: int
     rate_headers: frozenset[str]
     total_headers: frozenset[str]
@@ -52,7 +53,8 @@ def load_claim_rules(path: Path = DEFAULT_CLAIM_RULES) -> ClaimRules:
     """Read and check claim_rules.json. Raises StageError(stage="config")."""
     number = (int, float)
     d = read_json_config(path, {
-        "date_headers": list, "expense_columns": list, "min_expense_columns": int, "rate_headers": list,
+        "date_headers": list, "expense_columns": list, "expense_range": list, "min_expense_columns": int,
+        "rate_headers": list,
         "total_headers": list, "total_row_labels": list, "stop_row_labels": list, "header_search_rows": int,
         "header_block_max_rows": int, "ledger_code_min_digits": int, "empty_marks": list, "currency_codes": list,
         "month_names": dict, "ocr_digit_repairs": dict, "date_years": list, "max_claim_span_days": int,
@@ -80,6 +82,10 @@ def load_claim_rules(path: Path = DEFAULT_CLAIM_RULES) -> ClaimRules:
         columns.append(ExpenseColumn(entry["name"].strip(), tuple(w.lower().strip() for w in entry["words"])))
     if not columns:
         raise fail("'expense_columns' must list at least one column")
+    names = [c.name for c in columns]
+    ends = d["expense_range"]
+    if len(ends) != 2 or not all(isinstance(e, str) and e.strip() in names for e in ends) or ends[0] == ends[1]:
+        raise fail("'expense_range' must name two different columns of 'expense_columns': [first, last]")
     if not 1 <= d["min_expense_columns"] <= len(columns):
         raise fail("'min_expense_columns' must be between 1 and the number of expense columns")
 
@@ -118,6 +124,7 @@ def load_claim_rules(path: Path = DEFAULT_CLAIM_RULES) -> ClaimRules:
     return ClaimRules(
         date_headers=words("date_headers"),
         expense_columns=tuple(columns),
+        expense_range=(ends[0].strip(), ends[1].strip()),
         min_expense_columns=d["min_expense_columns"],
         rate_headers=words("rate_headers"),
         total_headers=words("total_headers"),

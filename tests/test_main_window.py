@@ -1,7 +1,10 @@
 """The window (main_window.py and its panes), off-screen, with FakeReader.
 
 Fake pages read "TOTAL n00.00" / "THANK YOU" / "DATE:0n/08/2026", plus
-"PIN: A012345678Z" on even pages (tests/fakes.py) — all fabricated.
+"PIN: A012345678Z" on even pages (tests/fakes.py) — all fabricated. The OCR
+text and Search panels were removed (D42): a page's reading is checked in
+the session itself, and the page preparation the checking relies on is
+tested here.
 """
 
 from __future__ import annotations
@@ -10,22 +13,21 @@ import dataclasses
 import sys
 import tempfile
 import unittest
-from datetime import date
 from pathlib import Path
 from unittest import mock
 
 from tests.qt import qt_app, wait_until  # sets the off-screen platform first
 
-from PySide6.QtCore import QDate, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QPushButton
 
 from app.errors import StageError
-from app.gui import application, search_controller
+from app.gui import application, page_preparer
 from app.gui.application import build_window, install_exception_hook
 from app.gui.main_window import MainWindow
 from app.gui.settings import load_settings
 from app.gui.startup_failure_window import StartupFailureWindow
-from tests.fakes import FAKE_PIN, FakeReader, make_pdf
+from tests.fakes import FakeReader, make_pdf
 
 
 class WindowTestCase(unittest.TestCase):
@@ -68,19 +70,17 @@ class WindowTestCase(unittest.TestCase):
         self.assertTrue(wait_until(lambda: not w.session.busy), "the document never finished")
         wait_until(lambda: False, 0.05)  # let the view settle
 
-    def search(self, w: MainWindow, when: date | None = None, amount: str = "", pin: str = "") -> None:
-        panel = w.search_panel
-        panel.date_field.setDate(QDate(when.year, when.month, when.day) if when else panel.date_field.minimumDate())
-        panel.amount.setText(amount)
-        panel.pin.setText(pin)
-        panel.search_button.click()
-        wait_until(lambda: False, 0.05)
+    @staticmethod
+    def text_of(w: MainWindow, page: int) -> str:
+        """A page's reading, grouped into printed rows."""
+        reading = w.session.reading(page)
+        return "\n".join(row.text for row in reading.rows) if reading else ""
 
 
 class FileListTests(WindowTestCase):
     def test_lists_only_claim_documents_by_name(self):
-        w = self.window()  # text files and folders are not listed; Excel claim sheets are (Stage C)
-        self.assertEqual(w.files.file_names(), ["A.PDF", "b.pdf", "claim.xlsx", "photo.jpg"])
+        w = self.window()  # text files, folders and (for now, D39) Excel files are not listed
+        self.assertEqual(w.files.file_names(), ["A.PDF", "b.pdf", "photo.jpg"])
 
     def test_missing_working_folder_is_an_error_not_a_crash(self):
         w = self.window(folder=self.folder / "does-not-exist")
@@ -107,7 +107,7 @@ class FileListTests(WindowTestCase):
         w = self.window(reader, read_ahead=True)
         self.assertTrue(wait_until(lambda: w.files.state_of("A.PDF") == "read" and w.files.state_of("b.pdf") == "read"))
         self.open(w, "A.PDF")
-        self.assertTrue(w.ocr_panel.text.startswith("TOTAL    100.00"))
+        self.assertTrue(self.text_of(w, 1).startswith("TOTAL    100.00"))
         self.assertEqual(sum(1 for name, _ in reader.pages_read if name == "A.PDF"), 3)
 
 
@@ -116,8 +116,8 @@ class ViewerTests(WindowTestCase):
         w = self.window()
         self.open(w, "b.pdf")
         self.assertEqual(w.page_pane.position_text, "Page 1 of 3")
-        self.assertEqual(w.ocr_panel.text, "TOTAL    100.00\nTHANK YOU\nDATE:01/08/2026")
-        self.assertIn("4 text segments in 3 rows", w.ocr_panel.status)
+        self.assertEqual(self.text_of(w, 1), "TOTAL    100.00\nTHANK YOU\nDATE:01/08/2026")
+        self.assertEqual(len(w.session.reading(1).result.words), 4)
         self.assertIn("b.pdf: 3 of 3 pages read.", w._status.text())
 
     def test_previous_and_next_page_move_through_the_scroll(self):
@@ -128,7 +128,6 @@ class ViewerTests(WindowTestCase):
             wait_until(lambda: False, 0.05)
             self.assertEqual(w.page_pane.current_page, expected)
         self.assertEqual(w.page_pane.position_text, "Page 3 of 3")
-        self.assertIn("300.00", w.ocr_panel.text, "the OCR panel follows the page in view")
         for _ in range(3):
             w.page_pane._prev.click()
             wait_until(lambda: False, 0.05)
@@ -140,7 +139,6 @@ class ViewerTests(WindowTestCase):
         bar = w.page_pane.view.verticalScrollBar()
         bar.setValue(bar.maximum())
         self.assertTrue(wait_until(lambda: w.page_pane.current_page == 3))
-        self.assertIn("300.00", w.ocr_panel.text)
 
     def test_only_pages_near_the_screen_are_drawn(self):
         make_pdf(self.folder / "long.pdf", 12)
@@ -159,15 +157,13 @@ class ViewerTests(WindowTestCase):
         wait_until(lambda: False, 0.05)
         w.page_pane.go_to_page(3)
         self.assertTrue(wait_until(lambda: w.page_pane.current_page == 3))
-        self.assertIn("Being read", w.ocr_panel.status)
-        self.assertTrue(wait_until(lambda: "300.00" in w.ocr_panel.text))
+        self.assertIn(3, w.page_pane.view.drawn_pages)
+        self.assertIsNone(w.session.reading(3), "the picture is shown before the page is read")
+        self.assertTrue(wait_until(lambda: "300.00" in self.text_of(w, 3)))
 
-    def test_failed_page_says_so_in_the_ocr_panel(self):
+    def test_a_failed_page_is_reported_and_counted(self):
         w = self.window(FakeReader(page_errors={2}))
         self.open(w, "b.pdf")
-        w.page_pane.go_to_page(2)
-        self.assertTrue(wait_until(lambda: w.page_pane.current_page == 2))
-        self.assertIn("could not be read", w.ocr_panel.status)
         self.assertIn("1 could not be read", w._status.text())
         self.assertEqual(len(w.errors.entries), 1)
 
@@ -210,7 +206,7 @@ class SwitchingFilesTests(WindowTestCase):
         self.open(w, "A.PDF")
         self.open(w, "b.pdf")
         self.assertEqual(self.questions, [])
-        self.assertTrue(w.ocr_panel.text.startswith("TOTAL    100.00"))
+        self.assertTrue(self.text_of(w, 1).startswith("TOTAL    100.00"))
         self.assertEqual(sum(1 for name, _ in reader.pages_read if name == "b.pdf"), 3, "b.pdf was read twice")
 
     def test_switching_while_still_reading_resumes_later(self):
@@ -245,146 +241,43 @@ class SwitchingFilesTests(WindowTestCase):
         self.assertFalse(w.isVisible())
 
 
-class SearchTests(WindowTestCase):
-    def test_all_three_keys_found_shows_that_page_with_highlights(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, date(2026, 8, 2), "200", FAKE_PIN)
-        self.assertEqual(w.page_pane.current_page, 2)
-        lines = w.search_panel.result_lines
-        self.assertIn("Date 02/08/2026: found on page 2 (1 place)", lines)
-        self.assertIn("Amount 200.00: found on page 2 (1 place)", lines)
-        self.assertIn(f"PIN {FAKE_PIN}: found on page 2 (1 place)", lines)
-        self.assertIn("Every searched key is on page 2; showing page 2.", lines)
-        self.assertIn("Searched all 3 pages.", lines)
-        self.assertGreaterEqual(w.page_pane.view.highlight_count, 3)
-        self.assertEqual(w.search_panel.match_position.text(), "match 1 of 3")
+class PagePreparationTests(WindowTestCase):
+    """Every read page is tokenised once for the checking (page_preparer.py)."""
 
-    def test_search_covers_every_page_and_steps_through_matches(self):
+    def test_a_page_that_cannot_be_prepared_is_reported_once_and_the_rest_are_prepared(self):
         w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, pin=FAKE_PIN)  # only on page 2 of 3 — add a 4-page file for two places
-        make_pdf(self.folder / "four.pdf", 4)
-        self.open(w, "four.pdf")
-        self.search(w, pin=FAKE_PIN)
-        self.assertIn(f"PIN {FAKE_PIN}: found on pages 2 and 4 (2 places)", w.search_panel.result_lines)
-        self.assertEqual(w.page_pane.current_page, 2)
-        w.search_panel.next_button.click()
-        self.assertTrue(wait_until(lambda: w.page_pane.current_page == 4))
-        self.assertEqual(w.search_panel.match_position.text(), "match 2 of 2")
-        w.search_panel.next_button.click()
-        self.assertTrue(wait_until(lambda: w.page_pane.current_page == 2), "Next match wraps round")
-
-    def test_no_page_with_every_key_shows_the_best_and_says_so(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, date(2026, 8, 3), "200", "")
-        self.assertIn("No page has every searched key; showing page 2 (1 of 2 keys).", w.search_panel.result_lines)
-
-    def test_nothing_found_moves_nothing(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, amount="999")
-        self.assertIn("Amount 999.00: not found", w.search_panel.result_lines)
-        self.assertIn("Nothing found.", w.search_panel.result_lines)
-        self.assertEqual(w.page_pane.view.highlight_count, 0)
-        self.assertEqual(w.page_pane.current_page, 1)
-
-    def test_invalid_input_is_explained_and_not_searched(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, amount="1.200")
-        self.assertIn("ambiguous", w.search_panel.message.text())
-        self.assertNotIn("1.200", w.search_panel.message.text())
-        self.assertEqual(w.search_panel.result_lines, [])
-        self.search(w)
-        self.assertIn("at least one", w.search_panel.message.text())
-
-    def test_search_without_a_document_asks_for_one(self):
-        w = self.window()
-        self.search(w, amount="100")
-        self.assertEqual(w.search_panel.message.text(), "Open a file first.")
-
-    def test_search_updates_as_pages_are_read(self):
-        w = self.window(FakeReader(delay=0.25))
-        w.files.file_chosen.emit(self.folder / "b.pdf")
-        self.assertTrue(wait_until(lambda: w.session.pages_read() >= 1))
-        self.search(w, amount="300")
-        self.assertTrue(any("still reading" in line for line in w.search_panel.result_lines))
-        self.assertTrue(wait_until(lambda: "Amount 300.00: found on page 3 (1 place)" in w.search_panel.result_lines))
-        self.assertTrue(wait_until(lambda: w.page_pane.current_page == 3), "the first find is brought into view")
-        self.assertTrue(wait_until(lambda: "Searched all 3 pages." in w.search_panel.result_lines))
-
-    def test_moving_through_pages_does_not_search_again(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, amount="100")
-        with mock.patch.object(w.search, "run") as run:
-            w.page_pane.go_to_page(3)
-            wait_until(lambda: False, 0.1)
-        run.assert_not_called()
-
-    def test_clear_removes_results_highlights_and_fields(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, amount="100")
-        w.search_panel.clear_button.click()
-        self.assertEqual(w.page_pane.view.highlight_count, 0)
-        self.assertEqual(w.search_panel.result_lines, [])
-        self.assertEqual(w.search_panel.amount.text(), "")
-
-    def test_opening_another_file_clears_the_search(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, amount="100")
-        self.open(w, "A.PDF")
-        self.assertEqual(w.page_pane.view.highlight_count, 0)
-        self.assertEqual(w.search_panel.result_lines, [])
-
-    def test_a_page_that_cannot_be_searched_is_reported_once_and_the_rest_are_searched(self):
-        w = self.window()
-        real = search_controller.prepare_page
+        real = page_preparer.prepare_page
 
         def failing(rows, rules):
             if rows and rows[0].text.startswith("TOTAL    200.00"):
                 raise RuntimeError("simulated")
             return real(rows, rules)
 
-        with mock.patch.object(search_controller, "prepare_page", side_effect=failing):
+        with mock.patch.object(page_preparer, "prepare_page", side_effect=failing):
             self.open(w, "b.pdf")
-            self.search(w, date(2026, 8, 3))
-            self.search(w, amount="300")
-            self.search(w, date(2026, 8, 3))
-        self.assertIn("Date 03/08/2026: found on page 3 (1 place)", w.search_panel.result_lines)
+            for _ in range(3):
+                pages, unread = w.pages.prepared_pages()
+        self.assertEqual((sorted(pages), unread), ([1, 3], [2]))
         matching = [e for e in w.errors.entries if "matching" in e.summary]
         self.assertEqual(len(matching), 1)
         self.assertIn("page 2", matching[0].summary)
-        self.assertNotIn("03/08/2026", matching[0].full_text)
+        self.assertNotIn("200.00", matching[0].full_text)
 
-    def test_pages_are_prepared_before_the_search_so_searching_is_only_lookups(self):
+    def test_pages_are_prepared_as_they_are_read_so_checking_is_only_lookups(self):
         w = self.window()
         self.open(w, "b.pdf")
         wait_until(lambda: False, 0.1)
-        with mock.patch.object(search_controller, "prepare_page") as prepare:
-            self.search(w, amount="200")
+        with mock.patch.object(page_preparer, "prepare_page") as prepare:
+            pages, unread = w.pages.prepared_pages()
         prepare.assert_not_called()
-        self.assertIn("Amount 200.00: found on page 2 (1 place)", w.search_panel.result_lines)
+        self.assertEqual((sorted(pages), unread), ([1, 2, 3], []))
 
-    def test_a_match_without_a_page_position_is_reported_not_silently_dropped(self):
-        w = self.window(FakeReader(no_page_boxes=True))
-        self.open(w, "b.pdf")
-        self.search(w, amount="200")
-        self.assertIn("Amount 200.00: found on page 2 (1 place)", w.search_panel.result_lines)
-        self.assertEqual(w.page_pane.view.highlight_count, 0)
-        self.assertTrue(any("could not be placed" in e.summary for e in w.errors.entries))
-        self.assertEqual(w.page_pane.current_page, 2, "the page is still brought into view")
-
-    def test_unusable_matching_rules_disable_search_and_say_why(self):
+    def test_unusable_matching_rules_are_reported_and_claims_cannot_be_checked(self):
         broken = StageError("config", "config file is not valid JSON", file="matching_rules.json")
-        with mock.patch.object(search_controller, "load_matching_rules", side_effect=broken):
+        with mock.patch.object(page_preparer, "load_matching_rules", side_effect=broken):
             w = self.window()
-        self.assertFalse(w.search_panel.search_button.isEnabled())
-        self.assertIn("unavailable", w.search_panel.message.text())
+        self.assertFalse(w.pages.available)
+        self.assertFalse(w.claims.available)
         self.assertIn("matching_rules.json", w.errors.entries[0].summary)
 
 
@@ -394,14 +287,6 @@ class StageScopeTests(WindowTestCase):
         labels = {b.text().lower() for b in w.findChildren(QPushButton)}
         for absent in ("verify", "decline", "next row", "previous row"):
             self.assertFalse(any(absent in label for label in labels), absent)
-
-    def test_no_verdict_is_shown(self):
-        w = self.window()
-        self.open(w, "b.pdf")
-        self.search(w, date(2026, 8, 2), "200", FAKE_PIN)
-        text = " ".join(w.search_panel.result_lines).upper()
-        for verdict in ("PASS", "CAUTION", "REVIEW"):
-            self.assertNotIn(verdict, text)
 
 
 class ErrorBoundaryTests(WindowTestCase):

@@ -5,6 +5,8 @@
                       discount label — or (A4m+) a total label standing right
                       above the amount as its column's header (telebirr's
                       "Settled Amount")
+    total_value       the amount the page prints as its total (the largest
+                      there), shown on its badge when it differs from the claim
     names_other_buyer a PIN-shaped value after a buyer label that is not the
                       company PIN (D13's CAUTION)
     whole_parts       the whole part of every amount printed with cents
@@ -24,6 +26,8 @@ from app.checking.rules import CheckingRules
 from app.matching import MatchingRules, PreparedPage, is_pin_shaped, pin_matches
 
 CENTS = re.compile(r"(.+)[.,](\d{2})")
+_SHOWN_WITH_CENTS = re.compile(r"(\d{1,3}(?:[,.' ]\d{3})+|\d+)[.,](\d{2})")
+_SHOWN_WHOLE = re.compile(r"\d{1,3}(?:,\d{3})+")
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,38 @@ def printed_as_total(hit, marks: TotalMarks, look_above: bool) -> bool:
         return False
     left, right = min(s.left for s in hit.segments), max(s.right for s in hit.segments)
     return any(row == hit.row - 1 and a < right and left < b for row, a, b in marks.headers)
+
+
+def total_value(page: PreparedPage, marks: TotalMarks, look_above: bool) -> Decimal | None:
+    """The largest amount with cents the page prints as its total — for showing
+    what the receipt says, never for deciding (the decision is printed_as_total)."""
+    values = []
+    for r, (tokens, cores) in enumerate(zip(page.amounts, page.amount_cores)):
+        for token, (core, _) in zip(tokens, cores):
+            value = _money(core)
+            if value is not None and (r in marks.rows or (look_above and _under_header(page, r, token, marks))):
+                values.append(value)
+    return max(values, default=None)
+
+
+def _money(core: str) -> Decimal | None:
+    """A plain printed amount: digits (grouped by thousands or not) with two decimals, or a whole
+    amount grouped by thousands ("1,306" — telebirr prints Birr without cents). Anything else
+    (an OCR slip gluing letters on) is not read."""
+    m = _SHOWN_WITH_CENTS.fullmatch(core)
+    if m:
+        return Decimal(f"{re.sub(r'[^0-9]', '', m.group(1))}.{m.group(2)}")
+    if _SHOWN_WHOLE.fullmatch(core):
+        return Decimal(core.replace(",", "") + ".00")
+    return None
+
+
+def _under_header(page: PreparedPage, r: int, token, marks: TotalMarks) -> bool:
+    segs = [page.rows[r].segments[i] for i in token.segments]
+    if not segs:
+        return False
+    left, right = min(s.left for s in segs), max(s.right for s in segs)
+    return any(row == r - 1 and a < right and left < b for row, a, b in marks.headers)
 
 
 def names_other_buyer(page: PreparedPage, pin: str | None, rules: CheckingRules, matching: MatchingRules) -> bool:

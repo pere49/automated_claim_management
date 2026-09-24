@@ -16,8 +16,9 @@ class SettingsTests(unittest.TestCase):
     def test_shipped_settings_load(self):
         settings = load_settings()
         self.assertEqual(settings.working_folder, paths.PROJECT_ROOT / "images")
-        self.assertEqual(settings.file_extensions, (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif", ".xlsx", ".xlsm"))
-        self.assertEqual(len(settings.right_pane_heights), 3)
+        self.assertEqual(settings.file_extensions, (".pdf", ".jpg", ".jpeg", ".png", ".heic", ".heif"))
+        self.assertEqual(len(settings.pane_widths), 3)
+        self.assertGreater(settings.pane_widths[2], settings.pane_widths[1], "the claim sheet is the widest pane")
         self.assertTrue(settings.tour_auto_start)
 
     def test_invalid_values_rejected(self):
@@ -36,9 +37,12 @@ class SettingsTests(unittest.TestCase):
             "highlight_colours": {"amount": "blue", "date": "#8250df", "pin": "#0f9d8a"},
             "neighbour_alpha": 300,
             "highlight_line_px": 0,
-            "right_pane_heights": [600, 200],
+            "status_cards": {"tint_alpha": 300, "value_pt": 13},
             "tour": {"auto_start": True, "green_ms": 0, "yellow_ms": 100},
-            "cell_colours": {"green": "#c6efce", "yellow": "yellow", "red": "#ffc7ce"},
+            "status_colours": {"green": "#1a7f37", "yellow": "yellow", "red": "#cf222e", "grey": "#8c959f"},
+            "sheet_view": {"margin_frac": 0.5, "row_button_frac": 0.8, "tint_alpha": 80, "current_colour": "#1f6feb",
+                           "current_line_px": 2, "label_height_frac": 0.55},
+            "badge": {"font_pt": 9, "padding_px": 4, "text_colour": "white"},
             "company_pin_key": " ",
         }
         with tempfile.TemporaryDirectory() as folder:

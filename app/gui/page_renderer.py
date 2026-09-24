@@ -9,7 +9,8 @@ that scales it back to page pixels.
 
 PDFs are rendered with pymupdf; a photo or screenshot (JPG, PNG, HEIC ...)
 is one page, read by the OCR module's own image reader (same pixels, same
-orientation as the OCR).
+orientation as the OCR). render_region() draws only part of a page — the
+claim sheet's printed area, given in fractions of the page (D39).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pymupdf
+from PySide6.QtCore import QRect
 from PySide6.QtGui import QImage, QPixmap
 
 from app.errors import StageError
@@ -55,6 +57,31 @@ def render_page(path: Path, number: int, ocr_dpi: int, display_dpi: int) -> tupl
             pix = doc[number - 1].get_pixmap(dpi=display_dpi, alpha=False)
             image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
             return QPixmap.fromImage(image.copy()), ocr_dpi / display_dpi  # copy: outlives pymupdf's buffer
+    except Exception as exc:
+        raise StageError("display", "could not display this page", file=path.name, page=number, cause=exc) from exc
+
+
+def render_region(path: Path, number: int, dpi: int, box: tuple[float, float, float, float]) -> QPixmap:
+    """The part of page `number` (1-based) inside `box` — (left, top, right, bottom)
+    in fractions of the page — drawn at `dpi` (a picture at its own size).
+    Raises StageError(stage="display")."""
+    left, top, right, bottom = box
+    if not 0 <= left < right <= 1 or not 0 <= top < bottom <= 1:
+        raise StageError("display", "the part of the page to draw is not inside the page", file=path.name, page=number)
+    if not _is_pdf(path):
+        pixmap = _image_pixmap(path, number)
+        w, h = pixmap.width(), pixmap.height()
+        return pixmap.copy(QRect(int(left * w), int(top * h), max(1, int((right - left) * w)),
+                                 max(1, int((bottom - top) * h))))
+    try:
+        with pymupdf.open(path) as doc:
+            page = doc[number - 1]
+            r = page.rect
+            clip = pymupdf.Rect(r.x0 + left * r.width, r.y0 + top * r.height, r.x0 + right * r.width,
+                                r.y0 + bottom * r.height)
+            pix = page.get_pixmap(dpi=dpi, clip=clip, alpha=False)
+            image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+            return QPixmap.fromImage(image.copy())
     except Exception as exc:
         raise StageError("display", "could not display this page", file=path.name, page=number, cause=exc) from exc
 

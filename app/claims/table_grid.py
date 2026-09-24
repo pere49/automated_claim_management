@@ -5,21 +5,30 @@ found in the picture). Each word goes into the cell whose row band and
 column band hold its centre — so a value printed a little high or low in
 its cell, or a row whose description wraps onto two text lines, still lands
 in the right row. Words outside the ruled table (the title, the name, the
-signatures) are left out. Rows with no text at all are dropped.
+signatures) are left out. Rows with no text at all are dropped. Each row
+and column keeps its position, so the window can point at a row or a cell
+on the page itself (D36, D39).
 """
 
 from __future__ import annotations
 
 from bisect import bisect_right
+from dataclasses import dataclass
 
 Word = tuple[float, float, float, float, str]      # x0, y0, x1, y1, text
 
 
-def build_grid(words: list[Word], row_lines: list[float], col_lines: list[float],
-               min_band: float) -> list[list[str | None]]:
+@dataclass
+class Table:
+    cells: list[list[str | None]]                  # rows of cell text
+    row_bands: list[tuple[float, float]]           # (top, bottom) of each row of cells
+    col_bands: list[tuple[float, float]]           # (left, right) of each column
+
+
+def build_table(words: list[Word], row_lines: list[float], col_lines: list[float], min_band: float) -> Table:
     rows, cols = _bands(row_lines, min_band), _bands(col_lines, min_band)
     if len(rows) < 2 or len(cols) < 2:
-        return []
+        return Table([], [], [])
     cells: dict[tuple[int, int], list[Word]] = {}
     for w in words:
         cx, cy = (w[0] + w[2]) / 2, (w[1] + w[3]) / 2
@@ -27,12 +36,20 @@ def build_grid(words: list[Word], row_lines: list[float], col_lines: list[float]
             continue
         cell = (bisect_right(rows, cy) - 1, bisect_right(cols, cx) - 1)
         cells.setdefault(cell, []).append(w)
-    grid = []
+    grid, bands = [], []
     for r in range(len(rows) - 1):
         row = [_text(cells.get((r, c), [])) for c in range(len(cols) - 1)]
         if any(row):
             grid.append(row)
-    return grid
+            bands.append((rows[r], rows[r + 1]))
+    return Table(grid, bands, [(cols[c], cols[c + 1]) for c in range(len(cols) - 1)])
+
+
+def printed_area(words: list[Word], table: Table) -> tuple[float, float, float, float] | None:
+    """(left, top, right, bottom) around every word and the ruled table."""
+    xs = [x for w in words for x in (w[0], w[2])] + [x for band in table.col_bands for x in band]
+    ys = [y for w in words for y in (w[1], w[3])] + [y for band in table.row_bands for y in band]
+    return (min(xs), min(ys), max(xs), max(ys)) if xs and ys else None
 
 
 def cluster(positions: list[float], tolerance: float) -> list[float]:

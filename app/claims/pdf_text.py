@@ -3,7 +3,8 @@
 A sheet exported from Excel carries its text and its cell borders; both are
 read exactly with pymupdf — no OCR, a few milliseconds. A page with fewer
 than pdf_min_text_words words is a picture and is read by OCR instead
-(image_grid.py).
+(image_grid.py). Positions are in PDF points; the page size comes along so
+they can be turned into fractions of the page.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from pathlib import Path
 import pymupdf
 
 from app.claims.rules import ClaimRules
-from app.claims.table_grid import Word, build_grid, cluster
+from app.claims.table_grid import Table, Word, build_table, cluster, printed_area
 from app.errors import StageError
 
 
@@ -22,7 +23,9 @@ from app.errors import StageError
 class TextPage:
     number: int
     words: list[Word]
-    grid: list[list[str | None]]
+    table: Table
+    size: tuple[float, float]                                  # page width, height (points)
+    printed: tuple[float, float, float, float] | None          # left, top, right, bottom (points)
 
 
 def text_pages(path: Path, rules: ClaimRules) -> list[TextPage]:
@@ -37,7 +40,9 @@ def text_pages(path: Path, rules: ClaimRules) -> list[TextPage]:
         for page in doc:
             words = [(w[0], w[1], w[2], w[3], w[4]) for w in page.get_text("words")]
             rows, cols = _lines(page, rules)
-            pages.append(TextPage(page.number + 1, words, build_grid(words, rows, cols, rules.pdf_min_band_pt)))
+            table = build_table(words, rows, cols, rules.pdf_min_band_pt)
+            pages.append(TextPage(page.number + 1, words, table, (page.rect.width, page.rect.height),
+                                  printed_area(words, table)))
         return pages
     except Exception as exc:
         raise StageError("claim sheet", "could not read the text of this PDF", file=path.name, cause=exc) from exc

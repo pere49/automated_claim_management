@@ -1,5 +1,5 @@
 {
-  "_about": "Rules for app/claims: how a claim sheet (Excel, or a PDF of it, or a scanned picture of it) is read. Every word is matched in lower case with spaces collapsed. Decided with the owner 2026-09-24 (blueprint section 6, decisions D24-D26).",
+  "_about": "Rules for app/claims: how a claim sheet (a PDF of it, or a scanned picture of it) is read. Every word is matched in lower case with spaces collapsed. Decided with the owner 2026-09-24 (blueprint section 6, decisions D24-D26).",
 
   "date_headers": ["date"],
   "_date_headers": "The header of the date column (the whole header cell, not part of it).",
@@ -13,7 +13,9 @@
     {"name": "Hotel", "words": ["hotel"]},
     {"name": "Other", "words": ["other"]}
   ],
-  "_expense_columns": "Every non-zero amount in these columns is one claim item (owner, D24). A column is recognised when its header block holds every listed word as a whole word.",
+  "_expense_columns": "The expense columns by name. A column is recognised when its header holds every listed word as a whole word.",
+  "expense_range": ["Motor Vehicle Fuel", "Other"],
+  "_expense_range": "Every non-zero amount in the columns from the first to the last named here (both included) is one claim item, whatever the columns in between are called, so a column added to the form is never skipped (owner, D24, D40). Without both ends on the sheet, the named columns alone count.",
   "min_expense_columns": 3,
   "_min_expense_columns": "A table is a claim table only when its header row holds the date header and at least this many expense columns.",
   "rate_headers": ["rate"],

@@ -8,7 +8,8 @@ one at a time when the window is idle, so a jump shows its page promptly. A page
 is reported once through `problem`.
 
 Highlights are overlay shapes placed in the same page pixels, so zooming and
-scrolling cost nothing. The view fits the page width until the officer zooms
+scrolling cost nothing; each page may carry a badge in its top-right corner
+(page_badges.py). The view fits the page width until the officer zooms
 with Ctrl + wheel.
 """
 
@@ -23,10 +24,11 @@ from PySide6.QtWidgets import (QGraphicsPixmapItem, QGraphicsPolygonItem, QGraph
                                QGraphicsSimpleTextItem, QGraphicsView, QWidget)
 
 from app.errors import ERROR, StageError
+from app.gui.page_badges import Badge, BadgeItem, BadgeStyle
 
 RenderFn = Callable[[int], tuple[QPixmap, float]]  # page number -> (picture, scale to page pixels)
 
-_PAGE_Z, _PICTURE_Z, _HIGHLIGHT_Z = 0, 1, 2
+_PAGE_Z, _PICTURE_Z, _HIGHLIGHT_Z, _BADGE_Z = 0, 1, 2, 3
 
 
 @dataclass(frozen=True)
@@ -54,12 +56,14 @@ class DocumentView(QGraphicsView):
         self.setBackgroundBrush(QBrush(QColor(128, 128, 128)))
         self.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform)
         self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)  # a steady width to fit to
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self._render: RenderFn | None = None
         self._rects: list[QRectF] = []                    # page n is self._rects[n - 1], in scene coordinates
         self._pictures: dict[int, QGraphicsPixmapItem] = {}
         self._failed: set[int] = set()
         self._highlights: list[QGraphicsPolygonItem] = []
+        self._badges: list[BadgeItem] = []
         self._current = 0
         self._fit = True
         self._refresh_timer = QTimer(self)
@@ -110,7 +114,7 @@ class DocumentView(QGraphicsView):
 
     def clear_document(self) -> None:
         self._scene.clear()
-        self._rects, self._pictures, self._highlights, self._ahead = [], {}, [], []
+        self._rects, self._pictures, self._highlights, self._badges, self._ahead = [], {}, [], [], []
         self._failed = set()
         self._render = None
         self._current = 0
@@ -171,6 +175,24 @@ class DocumentView(QGraphicsView):
     @property
     def highlight_count(self) -> int:
         return len(self._highlights)
+
+    def set_badges(self, badges: list[Badge], style: BadgeStyle) -> None:
+        """One badge per page at most, in the page's top-right corner (replaces the previous ones)."""
+        for item in self._badges:
+            self._scene.removeItem(item)
+        self._badges = []
+        for badge in badges:
+            if not 1 <= badge.page <= self.page_count:
+                continue
+            item = BadgeItem(badge, style)
+            item.setPos(self._rects[badge.page - 1].topRight())
+            item.setZValue(_BADGE_Z)
+            self._scene.addItem(item)
+            self._badges.append(item)
+
+    @property
+    def badges(self) -> dict[int, Badge]:
+        return {item.badge.page: item.badge for item in self._badges}
 
     # ---------------------------------------------------------------- events
 

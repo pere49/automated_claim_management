@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QStackedWidget, QVBoxLayout, QWidget
 
 from app.gui.document_view import DocumentView, RenderFn, Shape
+from app.gui.page_badges import Badge, BadgeStyle
 
 
 class PagePane(QWidget):
@@ -76,6 +77,9 @@ class PagePane(QWidget):
 
     def set_highlights(self, shapes: list[Shape]) -> None:
         self.view.set_highlights(shapes)
+
+    def set_badges(self, badges: list[Badge], style: BadgeStyle) -> None:
+        self.view.set_badges(badges, style)
 
     def _on_current(self, number: int) -> None:
         self._update_position(number)

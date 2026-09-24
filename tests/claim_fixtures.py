@@ -3,9 +3,9 @@
 form_grid() lays out a claim form like the real one — a title, a ruled
 "Name … Date …" line, a header row, two header-block rows holding ledger
 codes, data rows, a Total row, Less Advance, Balance — as a list of rows of
-cell values (columns A..O). It is then written as an Excel workbook
-(write_workbook) or drawn as a PDF with ruled lines and a text layer
-(write_pdf_form), so every reader can be tested on the same claim.
+cell values (columns A..O). It is then drawn as a PDF with ruled lines and a
+text layer (write_pdf_form), like a sheet exported from Excel; a picture of
+that page with its words stands in for a scanned sheet.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
-import openpyxl
 import pymupdf
 
 COLUMNS = ["", "Date", "Names of customers visited", "Project number", "Receipt No", "Motor", "Travel (Car",
@@ -63,22 +62,9 @@ def form_grid(entries: list[tuple[object, str, dict[str, object]]], *, total: bo
     return grid
 
 
-def write_workbook(path: Path, tabs: dict[str, list[list[object]]], active: str | None = None) -> Path:
-    book = openpyxl.Workbook()
-    book.remove(book.active)
-    for name, grid in tabs.items():
-        sheet = book.create_sheet(name)
-        for row in grid:
-            sheet.append([float(v) if isinstance(v, Decimal) else v for v in row])
-    if active is not None:
-        book.active = list(tabs).index(active)
-    book.save(path)
-    return path
-
-
 def write_pdf_form(path: Path, grid: list[list[object]], ruled_from_row: int = 2) -> Path:
     """The form drawn like an Excel export: ruled cells from `ruled_from_row`, a text layer."""
-    widths = [12, 52, 90, 60, 30] + [48] * 8 + [34, 52]
+    widths = [12, 52, 90, 60, 42] + [48] * 8 + [52, 60]          # every label fits its cell
     xs = [20.0]
     for w in widths:
         xs.append(xs[-1] + w)

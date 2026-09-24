@@ -1,4 +1,4 @@
-"""app/claims: reading claim sheets from Excel, PDF and scanned pictures (synthetic forms only)."""
+"""app/claims: reading claim sheets from a PDF (exported or scanned) — synthetic forms only."""
 
 from __future__ import annotations
 
@@ -10,12 +10,13 @@ from pathlib import Path
 
 import pymupdf
 
-from app.claims import (CLAIM_PERIOD, EMPTY, EXCEL, NO_FUTURE, ONE_MEANING, PDF_TEXT, SCANNED, SHEET_ORDER, UNDECIDED,
+from app.claims import (CLAIM_PERIOD, EMPTY, NO_FUTURE, ONE_MEANING, PDF_TEXT, SCANNED, SHEET_ORDER, UNDECIDED,
                         UNREADABLE, load_claim_rules, looks_like_claim_sheet, read_claim_file, sheet_kind)
 from app.claims.amounts import read_amount
+from app.claims.sheet_builder import build_sheet
 from app.claims.sheet_dates import read_dates
 from app.errors import StageError
-from tests.claim_fixtures import FIRST_DATA_ROW, form_grid, write_pdf_form, write_workbook
+from tests.claim_fixtures import form_grid, write_pdf_form
 
 TODAY = date(2026, 9, 24)
 RULES = load_claim_rules()
@@ -32,7 +33,17 @@ def items(sheet):
     return [(it.column, it.amount, it.date.value) for it in sheet.items]
 
 
-class ExcelTests(unittest.TestCase):
+def scanned_copy(pdf_path: Path, folder: Path, dpi: int = 200):
+    """The PDF's page as a picture, and its words in the picture's pixels (standing in for OCR)."""
+    with pymupdf.open(pdf_path) as doc:
+        scale = dpi / 72
+        words = [(w[0] * scale, w[1] * scale, w[2] * scale, w[3] * scale, w[4]) for w in doc[0].get_text("words")]
+        picture = folder / "scan.png"
+        doc[0].get_pixmap(dpi=dpi).save(picture)
+    return picture, words
+
+
+class PdfTestCase(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory()
         self.folder = Path(self._dir.name)
@@ -40,12 +51,17 @@ class ExcelTests(unittest.TestCase):
     def tearDown(self):
         self._dir.cleanup()
 
-    def book(self, tabs, active=None, name="claim.xlsx"):
-        return write_workbook(self.folder / name, tabs, active)
+    def pdf(self, grid, name="claim.pdf") -> Path:
+        return write_pdf_form(self.folder / name, grid)
 
+    def read(self, grid, name="claim.pdf"):
+        return read_claim_file(self.pdf(grid, name), RULES, TODAY)
+
+
+class ReadingTests(PdfTestCase):
     def test_every_expense_amount_is_one_item_with_its_rows_date(self):
-        claim = read_claim_file(self.book({"Week": form_grid(ENTRIES)}), RULES, TODAY)
-        self.assertEqual(claim.kind, EXCEL)
+        claim = self.read(form_grid(ENTRIES))
+        self.assertEqual(claim.kind, PDF_TEXT)
         sheet = claim.sheets[0]
         self.assertEqual(items(sheet), [
             ("Dinner", Decimal("750.00"), date(2026, 8, 10)),
@@ -54,43 +70,39 @@ class ExcelTests(unittest.TestCase):
             ("Travel", Decimal("1500.00"), date(2026, 8, 13)),
             ("Other", Decimal("300.00"), None),
         ])
-        self.assertEqual([it.row for it in sheet.items], [FIRST_DATA_ROW, 8, 8, 9, 10])
+        first = sheet.items[0].row
+        self.assertEqual([it.row for it in sheet.items], [first, first + 1, first + 1, first + 2, first + 3])
         self.assertEqual(sheet.grand_total, Decimal("3510.50"))
         self.assertEqual(sheet.currency, "KES")
         self.assertEqual(sheet.problems, [])
 
     def test_ledger_codes_in_the_header_never_become_amounts(self):
-        sheet = read_claim_file(self.book({"Week": form_grid(ENTRIES)}), RULES, TODAY).sheets[0]
+        sheet = self.read(form_grid(ENTRIES)).sheets[0]
         self.assertNotIn(Decimal("4740150"), [it.amount for it in sheet.items])
-        self.assertEqual(sheet.first_data_row, FIRST_DATA_ROW - 1)
 
     def test_the_name_line_holding_a_date_label_is_not_the_header(self):
-        sheet = read_claim_file(self.book({"Week": form_grid(ENTRIES)}), RULES, TODAY).sheets[0]
-        self.assertEqual(sheet.columns.date, 1)
+        sheet = self.read(form_grid(ENTRIES)).sheets[0]
+        self.assertEqual(sheet.grid[sheet.header_row][sheet.columns.date], "Date")
         self.assertEqual(len(sheet.columns.expenses), 8)
 
-    def test_dates_stored_swapped_by_the_excel_setting_are_read_right(self):
-        # typed day-first (3/8, 5/8, 6/8, 9/8/2026) into an Excel set to month-first: saved as 8 March, 8 May...
-        swapped = [(datetime(2026, d.day, d.month), "Meals", {"Dinner": 100 + i})
-                   for i, d in enumerate([date(2026, 8, 3), date(2026, 8, 5), date(2026, 8, 6), date(2026, 8, 9)])]
-        sheet = read_claim_file(self.book({"Week1": form_grid(swapped)}), RULES, TODAY).sheets[0]
-        self.assertEqual([it.date.value for it in sheet.items],
-                         [date(2026, 8, 3), date(2026, 8, 5), date(2026, 8, 6), date(2026, 8, 9)])
-        self.assertTrue(all(it.date.how == CLAIM_PERIOD for it in sheet.items))
-
-    def test_several_tabs_start_on_the_one_saved_last_and_skip_tabs_without_a_table(self):
-        path = self.book({"Week1": form_grid(ENTRIES), "Notes": [["just", "notes"]], "Week2": form_grid(ENTRIES[:1])},
-                         active="Week2")
-        claim = read_claim_file(path, RULES, TODAY)
-        self.assertEqual([s.name for s in claim.sheets], ["Week1", "Week2"])
-        self.assertEqual(claim.sheets[claim.active].name, "Week2")
-        self.assertEqual(claim.skipped, ["Notes"])
+    def test_pages_without_a_claim_table_are_skipped_and_named(self):
+        path = self.pdf(form_grid(ENTRIES))
+        with pymupdf.open(path) as doc:
+            notes = doc.new_page(0)
+            for i in range(25):
+                notes.insert_text((20, 30 + i * 12), f"notes line {i} about the trip")
+            doc.save(self.folder / "two.pdf")
+        claim = read_claim_file(self.folder / "two.pdf", RULES, TODAY)
+        self.assertEqual([s.name for s in claim.sheets], ["page 2"])
+        self.assertEqual(claim.skipped, ["page 1"])
+        self.assertEqual(claim.sheets[0].place.page, 2)
 
     def test_unreadable_amounts_become_items_with_a_reason_not_a_stop(self):
-        bad = [(datetime(2026, 8, 10), "Meals", {"Dinner": 12.345, "Lunch": "abc", "Other": -5, "Hotel": "1,060.00"})]
-        sheet = read_claim_file(self.book({"Week": form_grid(bad, total=False)}), RULES, TODAY).sheets[0]
+        bad = [(datetime(2026, 8, 10), "Meals", {"Dinner": "12.345", "Lunch": "abc", "Other": "-5",
+                                                "Hotel": "1,060.00"})]
+        sheet = self.read(form_grid(bad, total=False)).sheets[0]
         found = {it.column: (it.amount, it.problem) for it in sheet.items}
-        self.assertEqual(found["Dinner"], (None, "the amount has more than two decimals"))
+        self.assertEqual(found["Dinner"], (None, "not a number"))
         self.assertEqual(found["Lunch"], (None, "not a number"))
         self.assertEqual(found["Other"], (None, "a negative amount"))
         self.assertEqual(found["Hotel"], (Decimal("1060.00"), None))
@@ -98,67 +110,102 @@ class ExcelTests(unittest.TestCase):
 
     def test_rate_blank_or_zero_counts_as_one(self):
         for rate in (None, 0, 2):
-            sheet = read_claim_file(self.book({"W": form_grid(ENTRIES[:1], rate=rate)}, name=f"r{rate}.xlsx"),
-                                    RULES, TODAY).sheets[0]
+            sheet = self.read(form_grid(ENTRIES[:1], rate=rate), name=f"r{rate}.pdf").sheets[0]
             self.assertEqual(sheet.items[0].rate, Decimal(rate or 1))
-
-    def test_a_workbook_without_any_claim_table_is_an_error(self):
-        with self.assertRaises(StageError) as caught:
-            read_claim_file(self.book({"Notes": [["hello"]]}), RULES, TODAY)
-        self.assertIn("no claim table", caught.exception.detail)
-
-    def test_old_xls_and_damaged_files_are_refused_with_a_reason(self):
-        (self.folder / "old.xls").write_bytes(b"old")
-        (self.folder / "broken.xlsx").write_bytes(b"not a workbook")
-        with self.assertRaises(StageError) as old:
-            read_claim_file(self.folder / "old.xls", RULES, TODAY)
-        self.assertIn("save it as .xlsx", old.exception.detail)
-        with self.assertRaises(StageError) as broken:
-            read_claim_file(self.folder / "broken.xlsx", RULES, TODAY)
-        self.assertEqual(broken.exception.stage, "claim sheet")
-        self.assertEqual(broken.exception.file, "broken.xlsx")
 
     def test_a_totals_row_without_a_label_is_recognised_by_its_sums(self):
         grid = form_grid([(datetime(2026, 7, d), "Bakery", {"Daily Allowance": 48}) for d in range(16, 20)], total=False)
         sums = [None] * 15
         sums[10], sums[14] = 192, 192
         grid.insert(len(grid) - 2, sums)
-        sheet = read_claim_file(self.book({"EA": grid}), RULES, TODAY).sheets[0]
+        sheet = self.read(grid).sheets[0]
         self.assertEqual(len(sheet.items), 4)
         self.assertEqual(sheet.grand_total, Decimal("192.00"))
 
 
-class PdfTests(unittest.TestCase):
-    def setUp(self):
-        self._dir = tempfile.TemporaryDirectory()
-        self.folder = Path(self._dir.name)
+class ColumnRangeTests(unittest.TestCase):
+    """Every column from Motor to Other counts, whatever it is called (D40)."""
 
-    def tearDown(self):
-        self._dir.cleanup()
+    def test_a_column_added_between_motor_and_other_counts(self):
+        grid = form_grid([(datetime(2026, 8, 10), "Trip", {"Dinner": 750})])
+        for row in grid:
+            row.insert(12, None)                       # a column the form did not have, just before Other
+        grid[3][12] = "Parking fees"
+        grid[6][12] = 45
+        sheet = build_sheet("W", grid, list(range(1, len(grid) + 1)), RULES, TODAY)
+        self.assertEqual([(it.column, it.amount) for it in sheet.items],
+                         [("Dinner", Decimal("750.00")), ("Parking fees", Decimal("45.00"))])
 
-    def test_a_pdf_export_gives_the_same_items_as_the_workbook(self):
-        grid = form_grid(ENTRIES)
-        excel = read_claim_file(write_workbook(self.folder / "c.xlsx", {"W": grid}), RULES, TODAY).sheets[0]
-        pdf_path = write_pdf_form(self.folder / "c.pdf", grid)
+    def test_a_range_naming_an_unknown_column_is_a_config_error(self):
+        import json
+        from app.claims.rules import DEFAULT_CLAIM_RULES
+        good = json.loads(DEFAULT_CLAIM_RULES.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as folder:
+            for ends in (["Motor Vehicle Fuel", "Parking"], ["Other", "Other"], ["Motor Vehicle Fuel"]):
+                path = Path(folder) / "rules.json"
+                path.write_text(json.dumps({**good, "expense_range": ends}), encoding="utf-8")
+                with self.subTest(ends=ends), self.assertRaises(StageError) as caught:
+                    load_claim_rules(path)
+                self.assertIn("expense_range", caught.exception.summary)
+
+    def test_without_both_ends_only_the_named_columns_count(self):
+        grid = form_grid([(datetime(2026, 8, 10), "Trip", {"Dinner": 750, "Hotel": 900})])
+        grid[3][12] = "Sundries"                       # no "Other" header: the range has no end
+        grid[6][12] = 45
+        sheet = build_sheet("W", grid, list(range(1, len(grid) + 1)), RULES, TODAY)
+        self.assertEqual([it.column for it in sheet.items], ["Dinner", "Hotel"])
+
+
+class PlaceTests(PdfTestCase):
+    """Where the table sits on the page: the window points at rows and cells with it (D36, D39)."""
+
+    def page_words(self, path: Path):
+        with pymupdf.open(path) as doc:
+            page = doc[0]
+            return page.rect.width, page.rect.height, page.get_text("words")
+
+    def test_each_amounts_cell_holds_its_printed_value(self):
+        path = self.pdf(form_grid(ENTRIES))
+        sheet = read_claim_file(path, RULES, TODAY).sheets[0]
+        width, height, words = self.page_words(path)
+        for it, text in zip(sheet.items, ["750.00", "200.00", "760.50", "1,500.00", "300.00"]):
+            cell = sheet.place.cell(it.grid_row, it.grid_col)
+            word = next(w for w in words if w[4] == text)
+            x, y = (word[0] + word[2]) / 2 / width, (word[1] + word[3]) / 2 / height
+            self.assertTrue(cell.left < x < cell.right and cell.top < y < cell.bottom, text)
+            band = sheet.place.row_band(it.grid_row)
+            self.assertTrue(band.left <= cell.left and cell.right <= band.right)
+
+    def test_the_printed_area_holds_every_word_and_leaves_the_margins(self):
+        path = self.pdf(form_grid(ENTRIES))
+        p = read_claim_file(path, RULES, TODAY).sheets[0].place.printed
+        width, height, words = self.page_words(path)
+        self.assertTrue(0 < p.left < p.right < 1 and 0 < p.top < p.bottom < 1)
+        for w in words:
+            self.assertTrue(p.left <= w[0] / width + 1e-6 and w[2] / width <= p.right + 1e-6, w[4])
+            self.assertTrue(p.top <= w[1] / height + 1e-6 and w[3] / height <= p.bottom + 1e-6, w[4])
+
+    def test_a_scanned_sheet_places_its_cells_where_the_pdf_does(self):
+        pdf_path = self.pdf(form_grid(ENTRIES))
+        picture, words = scanned_copy(pdf_path, self.folder)
+        scanned = read_claim_file(picture, RULES, TODAY, scanned_words={1: words}, dpi=200).sheets[0]
+        text = read_claim_file(pdf_path, RULES, TODAY).sheets[0]
+        for a, b in zip(scanned.items, text.items):
+            ca, cb = scanned.place.cell(a.grid_row, a.grid_col), text.place.cell(b.grid_row, b.grid_col)
+            for u, v in ((ca.left, cb.left), (ca.top, cb.top), (ca.right, cb.right), (ca.bottom, cb.bottom)):
+                self.assertAlmostEqual(u, v, delta=0.01)
+
+
+class FileTests(PdfTestCase):
+    def test_a_scanned_sheet_read_through_its_ocr_words_gives_the_same_items(self):
+        pdf_path = self.pdf(form_grid(ENTRIES))
+        picture, words = scanned_copy(pdf_path, self.folder)
         self.assertEqual(sheet_kind(pdf_path, RULES), PDF_TEXT)
         self.assertTrue(looks_like_claim_sheet(pdf_path, RULES))
-        pdf = read_claim_file(pdf_path, RULES, TODAY)
-        self.assertEqual(items(pdf.sheets[0]), items(excel))
-        self.assertEqual(pdf.sheets[0].grand_total, excel.grand_total)
-
-    def test_a_scanned_sheet_read_through_its_ocr_words_gives_the_same_items(self):
-        grid = form_grid(ENTRIES)
-        pdf_path = write_pdf_form(self.folder / "c.pdf", grid)
-        dpi = 200
-        with pymupdf.open(pdf_path) as doc:
-            scale = dpi / 72
-            words = [(w[0] * scale, w[1] * scale, w[2] * scale, w[3] * scale, w[4]) for w in doc[0].get_text("words")]
-            picture = self.folder / "scan.png"
-            doc[0].get_pixmap(dpi=dpi).save(picture)
         self.assertEqual(sheet_kind(picture, RULES), SCANNED)
         with self.assertRaises(StageError):
             read_claim_file(picture, RULES, TODAY)          # a picture needs its OCR words first
-        scanned = read_claim_file(picture, RULES, TODAY, scanned_words={1: words}, dpi=dpi)
+        scanned = read_claim_file(picture, RULES, TODAY, scanned_words={1: words}, dpi=200)
         self.assertEqual(items(scanned.sheets[0]), items(read_claim_file(pdf_path, RULES, TODAY).sheets[0]))
 
     def test_a_receipt_pdf_does_not_look_like_a_claim_sheet(self):
@@ -169,6 +216,21 @@ class PdfTests(unittest.TestCase):
         doc.save(self.folder / "receipt.pdf")
         doc.close()
         self.assertFalse(looks_like_claim_sheet(self.folder / "receipt.pdf", RULES))
+        with self.assertRaises(StageError) as caught:
+            read_claim_file(self.folder / "receipt.pdf", RULES, TODAY)
+        self.assertIn("no claim table", caught.exception.detail)
+
+    def test_excel_and_damaged_files_are_refused_with_a_reason(self):
+        for name in ("claim.xlsx", "old.xls"):
+            (self.folder / name).write_bytes(b"a workbook")
+            self.assertFalse(looks_like_claim_sheet(self.folder / name, RULES))
+            with self.assertRaises(StageError) as caught:
+                read_claim_file(self.folder / name, RULES, TODAY)
+            self.assertIn("use the PDF of the claim sheet", caught.exception.detail)
+        (self.folder / "broken.pdf").write_bytes(b"not a pdf")
+        with self.assertRaises(StageError) as broken:
+            read_claim_file(self.folder / "broken.pdf", RULES, TODAY)
+        self.assertEqual((broken.exception.stage, broken.exception.file), ("claim sheet", "broken.pdf"))
 
 
 class DateTests(unittest.TestCase):
@@ -209,9 +271,9 @@ class DateTests(unittest.TestCase):
                          [date(2026, 7, 12), date(2026, 6, 12), date(2026, 8, 3), date(2026, 8, 10)])
         self.assertEqual([g.how for g in got[4:]], [EMPTY, EMPTY, UNREADABLE, EMPTY])
 
-    def test_excel_serial_numbers_are_dates(self):
-        got = self.read([46244])                                    # 2026-08-10
-        self.assertEqual(got[0].value, date(2026, 8, 10))
+    def test_date_cells_and_serial_numbers_are_dates(self):
+        got = self.read([46244, datetime(2026, 8, 10)])            # 2026-08-10 both
+        self.assertEqual([g.value for g in got], [date(2026, 8, 10), date(2026, 8, 10)])
 
 
 class AmountTests(unittest.TestCase):

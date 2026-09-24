@@ -7,7 +7,7 @@
 **Owner** = the project owner's decision, taken in conversation.
 **Derived** = a consequence I worked out while applying an owner decision. Derived entries bind in the same way, but they are the ones most worth challenging, because the owner has not separately confirmed each.
 
-Revision 4 (2026-09-24): D23–D33 added (the Stage C design, settled with the owner in one planning session, each rule measured first); D7, D8, D13, D14, D19 carry dated notes on what supersedes them; O1 is now scheduled (a measured trial opens C2). Revision 3 (2026-09-23): precedence rule above; D13–D22 added; D1, D2, D11 carry dated notes on what supersedes them. Revision 2 rewrote D4 and D6.
+Revision 6 (2026-09-24, later the same day): D42 added — the OCR text and Search panels removed, the statuses as cards under the claim sheet, the PIN switch a toggle, titles on both sides; D19, D38, D41 carry dated notes. Revision 5 (2026-09-24, same day, after the owner looked at Stage C): D34–D41 added — the Stage C rework (claim sheet shown as its PDF with row buttons, page badges, colour rule B, one Total status, status on the receipts side, Excel reading removed for now); D16, D24, D25, D29–D32 carry dated notes on what supersedes them. Revision 4 (2026-09-24): D23–D33 added (the Stage C design, settled with the owner in one planning session, each rule measured first); D7, D8, D13, D14, D19 carry dated notes on what supersedes them; O1 is now scheduled (a measured trial opens C2). Revision 3 (2026-09-23): precedence rule above; D13–D22 added; D1, D2, D11 carry dated notes on what supersedes them. Revision 2 rewrote D4 and D6.
 
 ---
 
@@ -203,6 +203,8 @@ Every flag can be changed after manual check (D2).
 **Owner**, 2026-09-23, approving the winners of `tools/search_criteria_trial/` (15,673 cases, 65 real pages, zero false matches for all three keys). Amounts: found with or without cents, only as a value on its own; without cents only beside a currency word or "/=", or ending a total line; printer marks, attached currency words, tax-code letters trimmed; split values joined only at a decimal tail. Dates: every printed form, label prefix trimmed, fused time tolerated. PIN: format-positional letter/digit repair, one differing character only for a configured OCR look-alike pair, fused label words removed. Details and numbers: blueprint §6. **Why:** a wrong PASS is worse than a REVIEW, so the rules were ranked by false matches first; each rejected alternative (no-cents anywhere, any-one-character PIN, general segment joining) was measured to produce false matches.
 
 ## D16 — Faded decimal point: CAUTION only *(revision 3)*
+> **Revised 2026-09-24 (D34):** a faded decimal point is an amount that does not match: the badge says "Amount", yellow (it never passes, as before).
+
 
 **Owner**, 2026-09-23. "430 00 KSh" read for 430.00 is reported as a possible match, never a PASS, because the same repair matches quantity-then-price lines.
 
@@ -215,6 +217,8 @@ Every flag can be changed after manual check (D2).
 **Owner**, 2026-09-23. Neighbouring segments extend along the same printed row only. One colour per key (amount blue, date purple, PIN teal). Every occurrence is highlighted.
 
 ## D19 — Search the whole document; the viewer scrolls *(revision 3)*
+
+> **Revised 2026-09-24 (D42):** the typed search (Stage B's Search panel) was removed from the window at the owner's request; the matcher behind it stays and is what the checking uses. The continuous scroll stays.
 
 > **Corrected, 2026-09-24 (D24, D28).** In Stage C each claimed *amount* (not each row) is checked once and mapped to its page.
 
@@ -237,10 +241,14 @@ Every flag can be changed after manual check (D2).
 **Owner**, 2026-09-24. The buyer PIN applies only to receipts from Kenya; Ethiopian receipts carry no buyer PIN (the telebirr "TIN" is the telecom operator's own, printed on every slip — removed from `.env`). So: the company's Kenyan PIN is held in `.env` (git-ignored, never committed; fabricated `A012345678Z` in anything committed). After OCR, a quick scan searches every receipt page for it: found on at least one page → the switch **"PIN required"** starts **Yes**; found on none → **No**. The officer can flip it at any time; colours and status follow at once (only the page assignment re-runs, never a search). Yes: an amount is green only with date, amount and PIN on the same page. No: the PIN is not needed (it is still highlighted where found). A claim mixing Kenyan and other receipts is handled by the officer flipping the switch (owner: keep it simple). **Why:** a PIN that most receipts can never carry cannot be a general requirement; the scan makes the right default automatic without guessing a country.
 
 ## D24 — What is claimed *(revision 4)*
+> **Revised 2026-09-24 (D40):** the expense columns are every column from Motor Vehicle Fuel to Other inclusive, whatever their names.
+
 
 **Owner**, 2026-09-24. Every non-zero amount in the expense columns — Motor Vehicle Fuel through Other, all of them, Daily Allowance included — is one **claim item**, paired with its row's date; one row can hold several items, each an individual receipt on its own page. The Total column is the row's total, Rate multiplies (derived: blank or 0 counts as 1, as the sheet's own formulas do), Less Advance and Balance are ignored. Receipt / invoice numbers on the sheet are ignored entirely. The claim sheet gets **no duplicate check**: the same amount can honestly be spent twice in a day. A daily allowance with no receipt is simply yellow ("no receipt found"); there is no exempt list.
 
 ## D25 — Reading the claim sheet *(revision 4)*
+> **Revised 2026-09-24 (D39):** for now the claim sheet arrives as a PDF (exported, or a scanned picture); Excel reading is removed from the application (kept in git history, commit e202fa6).
+
 
 **Owner**, 2026-09-24 (the input may be Excel or PDF; must work on both; Excel read with no noticeable delay). **Derived design, owner-approved ("do the best you think"):** `.xlsx`/`.xlsm` read directly with openpyxl (already installed; 32–42 ms for the real two-sheet workbook in read-only mode), values as saved (formulas give their saved result). A workbook with several claim sheets shows them as tabs, starting on the sheet it was saved on. The header block (possibly several rows, holding ledger codes like 4740150) is found by header words in config; amounts are read only from the data rows between the header block and the Total row, so codes never become claims. Floats become exact cents (a typed cell with more than two decimals is flagged, never rounded silently). `.xls` is refused with a clear message (no new library). A PDF claim sheet is read from its **text layer** when it has one (sheets exported from Excel do: exact, milliseconds) and through OCR otherwise; either way the table is rebuilt from the header columns' positions and row bands (a wrapped description puts one row's numbers on two text lines). Pairing: two slots, "Claim sheet" and "Receipts"; Excel + PDF fill themselves; with two PDFs the sheet is recognised by its header words; the officer can swap.
 
@@ -258,19 +266,27 @@ Every flag can be changed after manual check (D2).
 **Owner**, 2026-09-24. Each receipt page approves at most one claim item, and the **first match found wins** (owner: "search for 500, when found skip to 700"). Every item is checked at once after OCR, not live. **Derived, measured:** each claim searches only the pages that print its amount (an index of every amount text, built once per document) — the same page for every claim as searching every page, 13× faster at 26 pages, 138× at 500 (`tools/stage_c_timing/`). Results are kept; the PIN switch re-runs only the assignment. **Owner, restated as a general security rule (2026-09-24):** once a claimed amount's date and amount (and the PIN, when required) are found on a page, that page is paired with that amount and every later search looks only at unpaired pages. Tried end to end on the owner's real claims with `tools/stage_c_dryrun/` (Week1, Week2, July, a wrong pair, and stress cases): no page was ever paired twice; the same amount claimed twice with one receipt gives green then yellow "already paired with row 9".
 
 ## D29 — Repeated receipt pages *(revision 4)*
+> **Revised 2026-09-24 (D34, D35):** a repeated page's badge is always red ("Repeated"); the status rule below stays for the claims relying on it.
+
 
 **Owner**, 2026-09-24. After the PIN scan and before checking, the receipts are checked for repeated pages. **Measured** (`tools/duplicate_pages_trial/`, 65 real pages, 15 same-receipt pairs captured differently, 2,065 different pairs): whole-page word overlap cannot separate them (same receipt as low as 0.45, different up to 0.72). **Two checks, catching 9 of 15 with 0 wrong** (387 different-receipt pairs inside a document, 1,678 across): nearly identical text (≥ 0.90; always catches the same scan repeated) and same date + same time + a shared amount. *Corrected the same day:* a third check — two or more long reference numbers printed on those two pages only — first measured 13 of 15 with 0 wrong, but "only" had been counted across all 65 pages of many files; counted inside one claim's PDF, as the application runs it, it flags two receipts from the same shop (their PO box, PIN, phone and till serial): 2 wrong inside a document, 15 across. The Stage C dry run found it on the real week-1 claim. Dropped, with every variant tried (with a shared date, with a shared amount, text ≥ 0.60 + date). An invoice-number check was also measured and rejected (a value read on only 23 of 65 pages; reading telebirr's letter-heavy numbers gave 190 wrong). Both checks run indexed (milliseconds).
 **Status rule (owner):** green — no repeated page; **yellow** — a receipt is repeated but only one claim relies on it (the claim stays green on the first copy); **red** — a repeated receipt that two claims with the same amount on the same date rely on: **both amounts red**, neither counted in Grand total 2. The "same amount twice on one day" check runs only when a repeat was detected. Repeats cannot show green while a page is unread. Accepted risk: an undetected repeat (6 of 15 re-captured receipts in the trial; a page repeated as the same scan is always detected) plus the same amount claimed twice that day would show two greens.
 
 ## D30 — Colours, status and totals *(revision 4)*
+> **Revised 2026-09-24:** colours now follow rule B (D34); the two grand totals are one Total status (D37); the status sits on the receipts side (D38).
+
 
 **Owner**, 2026-09-24. Claim-sheet amounts: **green** when date, amount and (if required) PIN are on one unused page; **yellow** for everything else, with a plain reason (CAUTION shows here too, e.g. "possible match"); **red** for one receipt claimed twice (D29). Receipt highlights stay amount blue, date purple, PIN teal. A small status strip holds **Verification** (green only when every amount is green, Grand total 2 matches and every receipt page was read; else yellow — it replaces the earlier "document approved" light), **PIN** (green on every matched receipt; red when missing on one; grey "not required" when the switch is No) and **Repeated pages** (D29). At the bottom of the sheet: **Grand total 1** (the sheet's own arithmetic: row amounts against the grand Total; with a Rate, amounts × Rate) and **Grand total 2** (the approved amounts against the grand Total). When Grand total 1 fails, the rows whose own Total disagrees with their amounts are named. Yellow reasons say how near the miss was ("receipt dated one day earlier (23:55)"). A page carrying the amounts of several claims (the claim sheet itself or a statement scanned into the receipts) would approve the first claim; the owner agrees it is a safety issue but decides that **for now the claim sheet and the receipts always arrive as separate files** — the guard is recorded, not built.
 
 ## D31 — Auto and Manual *(revision 4)*
+> **Revised 2026-09-24 (D36):** amounts are chosen with the row buttons, not by clicking cells; Auto and Next to check stay.
+
 
 **Owner**, 2026-09-24. Checking happens all at once when reading finishes, so the live demonstration is a **tour** replaying the results: it starts by itself (config), selects each amount in sheet order, brings its receipt into view with highlights, lingers briefly on green and longer on yellow (config). Clicking any amount switches to **Manual** (the tour pauses; the page appears at once, from the saved result); **Auto** resumes where the tour stopped; **Next to check** jumps to the next yellow; keys: Space (Auto / pause), N (next to check), arrows (move between amounts).
 
 ## D32 — Layout *(revision 4)*
+> **Revised 2026-09-24 (D38, D41):** superseded by the reworked layout.
+
 
 **Owner**, 2026-09-24. Right column, top to bottom: a **small** status strip (with the PIN switch, Auto and Next to check), the claim-sheet grid taking most of the height (sheet tabs, Grand totals at its bottom), and a bottom slot a little smaller than today's search panel holding two tabs, **OCR text** and **Search** (the typed search stays).
 
@@ -279,6 +295,46 @@ Every flag can be changed after manual check (D2).
 > **Done, 2026-09-24 (owner: "do the recommended").** Total anchor: rule **A4m+** adopted — the amount on a total-labelled row, or under a total label standing as its column's header; never on a cash / change / card / discount row or a tax line (%). Measured through the application's own finder: 31 of 31 claimed amounts kept; every cash-tendered, change, tax and before-discount amount refused. The trial's first version was flawed (it accepted amounts it could not locate, so telebirr's cent-less amounts were never tested) and was corrected the same day; see `tools/total_anchor_trial/`. Different-buyer PIN: built as a CAUTION; 0 wrong flags on 71 real pages, no positive case in the samples.
 
 **Owner**, 2026-09-24. C2 opens with a measured trial (like every rule so far) for **what anchors a claimed amount as the receipt's total** (O1: on 64 real pages, 6 print an amount larger than the claimable total, 3 of them on a cash / tender / change row — a claim of the cash handed over would pass today) and for the **different-buyer-PIN** CAUTION already decided in D13 (it must make 0 wrong flags on the real pages). Deferred to the next stage: the officer's own sign-off on each amount (D2, D3), so Verification cannot turn green while any amount is yellow. Later, not Stage C: repeats **across** claims (the same receipt in two weeks' claims), by keeping one-way fingerprints of checked receipts, never document text.
+
+## D34 — Colour rule B: red means no valid receipt *(revision 5)*
+
+**Owner**, 2026-09-24, choosing between two rules measured on the real claims (`tools/badge_colour_trial/`). 🔴 **Red** = no valid receipt: no receipt found, a repeated page, one receipt claimed twice, the company PIN missing when required, another buyer's PIN, an unreadable page. 🟡 **Yellow** = a receipt is there but its date or its amount does not match (a faded decimal point and an amount not printed as the total count as "Amount"), whatever the PIN switch says. 🟢 **Green** = date, amount and (when required) PIN all match. **Why:** the owner's first rule (PIN not required → any miss red) gave the July claim 10 red rows and no yellow — five with no receipt at all mixed with five holding a receipt one detail off (one dated a day earlier) — and turning the PIN switch off made colours stricter. On the Kenyan claims both rules give identical colours. Nothing is lost: a yellow is never counted as verified (Total stays red "Not matched"), Verification lists yellow pages as well as red, Next to check stops on both, and only the officer's own sign-off (Stage D) may count it.
+
+## D35 — Receipt pages and their badges *(revision 5)*
+
+**Owner**, 2026-09-24. Every receipt page carries a solid badge in its top-right corner: ✓ in green, or the problem in yellow / red with only these words — **Date, Amount, PIN, Repeated, Unreadable** — and the mismatch (owner, "4b"): `Amount 320.00 ≠ 330.00`, `Date 13 Aug ≠ 14 Aug`. **Linking a page to a row** (derived, owner-approved "2a"): a page is linked to the claimed amount it was paired with; else to the amount it prints (the best such free page, as before); else, for an amount printed on no free page, to the one free page carrying its date — only when that page is the only free page with the date and the amount is the only unlinked one with it (never a guess). An amount linked to no page is **No receipt found** (red). A page linked to no amount shows "Date · Amount" (plus PIN when required and missing). A page is linked to at most one amount.
+
+## D36 — Row buttons replace clicking cells *(revision 5)*
+
+**Owner**, 2026-09-24. A small square button left of each claim row, on the claim sheet as shown. Clicking it shows the row's first amount on its receipt; clicking again the next, and after the last back to the first. The button is the row's status: green when every amount in the row is verified, else the worst colour of its amounts (red over yellow). A failing amount's cell is tinted in its colour; an amount with no receipt is tinted red with the small text "No receipt found". The typed search (Search tab) stays.
+
+## D37 — One Total status *(revision 5)*
+
+**Owner**, 2026-09-24. With A = the sheet's amounts added up (× Rate), V = the verified amounts, T = the Total written on the sheet: A = V = T → 🟢 "Total matched"; A = V ≠ T → 🟡 "Excel mistake"; otherwise 🔴 "Not matched". **Derived:** no Total on the sheet → 🟡 "No total" when A = V, else 🔴 "Not matched"; A = V = T but a row's own Total disagreeing with its amounts → 🟡 "Excel mistake" (the rows named in the tooltip).
+
+## D38 — Status on the receipts side *(revision 5)*
+
+> **Revised 2026-09-24 (D42):** Verification, Total and Repeated moved to cards under the claim sheet; only the PIN toggle, Auto and Next to check stay above the receipts.
+
+**Owner**, 2026-09-24. Above the receipts, kept small, no notes beside the dots: ● Verification (the failing receipt pages, "p. 2, 5"; no pages when none failed), ● Total (D37), ● Repeated, ● PIN with the "PIN required" Yes / No switch; Auto and Next to check stay. Details only in the tooltips. The reason line under the sheet and the two grand-total lines are removed. **Derived:** Verification is red when any page or amount is red, yellow when any is yellow, green only when all are green and every page was read; amounts with no receipt add their rows ("row 12").
+
+## D39 — The claim sheet as its PDF *(revision 5)*
+
+**Owner**, 2026-09-24. For now the claim sheet is a PDF (an export with a text layer, or a scanned picture); Excel reading is removed (git history keeps it, commit e202fa6). The sheet is shown as the document itself, margins cropped to the printed area (measured: the printed area fills 85–90 % of the width and 58 % of the Week 2 page height), fitted to the pane's width, scrolled vertically. Receipt highlights (amount, date, PIN) stay on every page all the time. Scrolling the receipts puts the row of the page in view in the middle of the sheet, outlined blue; pages of the same row do not move the sheet; a page linked to no row clears the outline without moving.
+
+## D40 — Expense columns: Motor to Other *(revision 5)*
+
+**Owner**, 2026-09-24. Every amount in a row between the Motor Vehicle Fuel column and the Other column, inclusive, is a claimed amount — whatever the columns in between are called, so a column added to the form is never skipped. On the three real sheets this is exactly the eight named columns.
+
+## D41 — Layout and file list *(revision 5)*
+
+> **Revised 2026-09-24 (D42):** the OCR text / Search tabs are gone; the claim sheet takes its column's full height above the status cards.
+
+**Owner**, 2026-09-24. Files ~11 %, receipts ~36 % (status on top), claim sheet ~53 % with the OCR text / Search tabs below it, smaller than before; every divider drags, sizes in `gui_settings.json`. The file list shows the main working folder only (sub-folders ignored).
+
+## D42 — Status cards under the sheet, no OCR text or Search *(revision 6)*
+
+**Owner**, 2026-09-24, after using the reworked window ("everything is working very fine"). The **OCR text and Search panels are removed completely** — not hidden, not moved to a tab (owner chose "remove it completely" over keeping OCR text as a tab beside Errors). In their place, under the claim sheet, three **status cards**: **VERIFICATION** (the failing receipt pages; small line: how many amounts have no receipt), **TOTAL GRAND** (the Total status renamed; small line: the figures — "4,570.00 of 4,900.00"), **REPEATED** (the repeated pages; small line: which pages they repeat) — each with a bar and a light tint in its status colour, the title in capitals, the status large, one small line (owner "3a"), details on hover. The **"PIN required" switch becomes a toggle** (ON / OFF), kept above the receipts with Auto and Next to check where they were (owner "1: the same place"); when ON its colour is the PIN status (green on every receipt, red missing somewhere; pages on hover), OFF grey (owner "4 ok"). Titles: **"Receipt claim: <file>"** over the receipts, **"Claim sheet: <file>"** over the sheet. **Why / derived:** the checking still tokenises every page with the matcher, so the search controller's page preparation stays as `page_preparer.py`; the typed-search code (search panel, controller's query part, summary) and the OCR text panel are deleted (git history keeps them). Accepted consequences, stated to the owner before the choice: no view of the raw OCR text for diagnosing a "Date ?" badge (the Errors tab remains the diagnostic channel), and no typed search to hunt for a receipt the rules could not link.
 
 ---
 
@@ -306,6 +362,8 @@ O2 (how to know a row was paid by card) is **closed** by D10 — nothing depends
 | D7 Form carries invoice number | Superseded (D24) |
 | D8 Duplicate key from read values | Superseded (D29) |
 | D23–D33 Stage C design | Yes — blueprint §3, §4, §6, §7, §9, §12, §13 (2026-09-24) |
+| D34–D41 Stage C rework | Yes — blueprint §3, §6, §7, §12 (2026-09-24) |
+| D42 status cards, no OCR text / Search | Yes — blueprint §3, §7, §12 (2026-09-24) |
 | D10 Document type does not gate | No |
 | D11 Three flags | No |
 | D12 One crop per match | No |

@@ -14,14 +14,15 @@ from decimal import Decimal
 
 from app.claims.amounts import read_amount, read_rate
 from app.claims.layout import find_layout
-from app.claims.model import ClaimItem, ClaimRow, ClaimSheet
+from app.claims.model import ClaimItem, ClaimRow, ClaimSheet, SheetPlace
 from app.claims.rules import ClaimRules
 from app.claims.sheet_dates import read_dates
 
 
 def build_sheet(name: str, grid: list[list[object]], row_numbers: list[int], rules: ClaimRules,
-                today: date) -> ClaimSheet | None:
-    """None when the grid holds no claim table."""
+                today: date, place: SheetPlace | None = None) -> ClaimSheet | None:
+    """None when the grid holds no claim table. `place`: where the grid's rows
+    and columns sit on the page, when known."""
     width = max((len(r) for r in grid), default=0)
     grid = [list(r) + [None] * (width - len(r)) for r in grid]
     layout = find_layout(grid, rules)
@@ -50,7 +51,7 @@ def build_sheet(name: str, grid: list[list[object]], row_numbers: list[int], rul
 
     grand, grand_cell, problems = _grand_total(grid, layout, rules)
     return ClaimSheet(name, grid, layout.header_row, layout.first_data_row, layout.end_row, cols, rows, grand,
-                      grand_cell, layout.currency, row_numbers, problems)
+                      grand_cell, layout.currency, row_numbers, problems, place)
 
 
 def _grand_total(grid, layout, rules) -> tuple[Decimal | None, tuple[int, int] | None, list[str]]:

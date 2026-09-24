@@ -8,11 +8,9 @@
     ".jpeg",
     ".png",
     ".heic",
-    ".heif",
-    ".xlsx",
-    ".xlsm"
+    ".heif"
   ],
-  "_file_extensions": "Which files the left list shows: PDFs, photos or screenshots (JPG, PNG, HEIC; an image is one page), and from Stage C Excel claim sheets (.xlsx, .xlsm; old .xls files are refused with a message).",
+  "_file_extensions": "Which files the left list shows (the working folder only, not its sub-folders — D41): PDFs, photos or screenshots (JPG, PNG, HEIC; an image is one page). Claim sheets arrive as PDFs for now; Excel files are not read (D39).",
   "pdf_render_dpi": 300,
   "_pdf_render_dpi": "Resolution PDF pages are rendered at, for OCR and for display alike (one coordinate frame for both). The OCR enhancement rules were measured on 300 dpi renders; change both together.",
   "zoom_step": 1.15,
@@ -24,16 +22,11 @@
     950
   ],
   "pane_widths": [
-    220,
-    640,
-    700
+    160,
+    520,
+    780
   ],
-  "right_pane_heights": [
-    70,
-    480,
-    220
-  ],
-  "_sizes": "Starting sizes in pixels; the officer can drag every divider. right_pane_heights: the status strip (kept small), the claim sheet (most of the height), the OCR text / Search tabs (a little smaller than the Stage B search panel) — owner, D32.",
+  "_sizes": "Starting widths in pixels, shared out in proportion to the window until the officer drags a divider: files, receipts (with their header above them), claim sheet (with the status cards under it) — about 11 %, 36 %, 53 % (owner, D41, D42).",
   "shutdown_wait_seconds": 60,
   "_shutdown_wait_seconds": "On closing, how long to wait for a page that is mid-OCR to finish before the background thread is stopped by force.",
   "read_ahead": true,
@@ -60,21 +53,34 @@
     "green_ms": 1200,
     "yellow_ms": 2600
   },
-  "_tour": "The Auto tour (D31): starts by itself when a claim has been checked; lingers green_ms on a green amount, yellow_ms on a yellow or red one (its reason is shown).",
+  "_tour": "The Auto tour (D31): starts by itself when a claim has been checked; lingers green_ms on a green amount, yellow_ms on a yellow or red one.",
   "status_colours": {
     "green": "#1a7f37",
     "yellow": "#bf8700",
     "red": "#cf222e",
     "grey": "#8c959f"
   },
-  "cell_colours": {
-    "green": "#c6efce",
-    "yellow": "#fff2a8",
-    "red": "#ffc7ce"
+  "_status_colours": "The status dots, the page badges, the row buttons and the tint of an amount that failed (owner: green verified; yellow a receipt whose date or amount does not match; red no valid receipt — D34). Receipt highlights keep highlight_colours.",
+  "sheet_view": {
+    "margin_frac": 0.01,
+    "row_button_frac": 0.8,
+    "tint_alpha": 80,
+    "current_colour": "#1f6feb",
+    "current_line_px": 2,
+    "label_height_frac": 0.55
   },
-  "_colours": "status_colours: the dots of the status strip and the grand totals; cell_colours: the claimed amounts on the sheet (owner: green verified, yellow manual check, red one receipt claimed twice). Receipt highlights keep highlight_colours.",
-  "sheet_column_max_px": 130,
-  "_sheet_column_max_px": "Widest a claim-sheet column starts (long descriptions are cut, shown in full on hover), so Date, the expense columns and Total fit together.",
+  "_sheet_view": "The claim sheet shown as its PDF (D36, D39): cropped to its printed area plus margin_frac of the page on each side, fitted to the pane's width. row_button_frac: a row's button as a share of the row's height. tint_alpha (0-255): how strongly an amount that failed is tinted in its colour. current_colour / current_line_px: the outline of the row in view and of the amount shown. label_height_frac: the 'No receipt found' text as a share of the row's height.",
+  "status_cards": {
+    "tint_alpha": 38,
+    "value_pt": 13
+  },
+  "_status_cards": "The three cards under the claim sheet (D42): how strongly each is tinted in its status colour (0-255) and the size of its large words.",
+  "badge": {
+    "font_pt": 9,
+    "padding_px": 4,
+    "text_colour": "#ffffff"
+  },
+  "_badge": "The solid badge in each receipt page's top-right corner (D35): its text size and padding on screen (it stays the same size at any zoom) and its text colour; the fill is the page's status colour.",
   "company_pin_file": ".env",
   "company_pin_key": "COMPANY_PINS",
   "_company_pin": "Where the company's Kenyan PIN is kept (D23): a git-ignored file at the project root, KEY=value lines; the first PIN listed is searched. Never shown, logged or committed."

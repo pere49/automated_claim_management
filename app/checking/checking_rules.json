@@ -61,5 +61,22 @@
   "date_pattern": "(?<!\\d)(\\d{1,2})[/.-](\\d{1,2})[/.-](\\d{2,4})(?!\\d)",
   "time_pattern": "(?<!\\d)([01]?\\d|2[0-3]):([0-5]\\d)(?!\\d)",
   "amount_pattern": "(?<![\\d.,])\\d{1,3}(?:[,.' ]\\d{3})*[.,]\\d{2}(?!\\d)|(?<![\\d.,])\\d+[.,]\\d{2}(?!\\d)",
-  "_patterns": "How the repeat check reads a page's dates (day-first), times and amounts."
+  "_patterns": "How the repeat check reads a page's dates (day-first), times and amounts.",
+  "red_problems": ["no_receipt", "repeated", "pin", "other_buyer", "unreadable"],
+  "_red_problems": "Colour rule B (owner, D34; measured with tools/badge_colour_trial): red = no valid receipt (none found, a repeated page, one receipt for two claims, the company PIN missing when required, another buyer's PIN, a page that could not be read). Every other problem (date, amount) is yellow: a receipt is there but one detail does not match.",
+  "badge_lines": {
+    "ok": "✓",
+    "amount": "Amount {receipt} ≠ {claimed}",
+    "date": "Date {receipt} ≠ {claimed}",
+    "date_not_on_sheet": "Date: none on the sheet",
+    "pin": "PIN missing",
+    "other_buyer": "PIN of another buyer",
+    "repeated": "Repeated p. {page}",
+    "unreadable": "Unreadable",
+    "no_receipt": "No receipt found",
+    "no_claim": "Date · Amount",
+    "unknown": "?"
+  },
+  "badge_date_format": "%d %b",
+  "_badge": "What a receipt page's badge says (owner, D35 '4b'): the problem word and the mismatch — {receipt} what the receipt prints (its total, its date nearest the claimed one), {claimed} the claim sheet's value, {page} the other copy of a repeated page; 'unknown' when a value cannot be read; 'date_not_on_sheet' when the claim sheet gives no date to compare. 'no_claim': a page no claimed amount is linked to."
 }

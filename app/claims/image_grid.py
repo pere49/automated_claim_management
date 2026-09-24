@@ -5,7 +5,7 @@ and opened with long thin kernels: what survives is the ruled lines, not
 the text. Vertical lines must be longer than any digit is tall. The OCR
 words (in the same pixel frame as the picture) are then placed in the cells
 (table_grid.py); an OCR segment holding several words is split so each word
-lands in its own column.
+lands in its own column. Positions stay in the picture's pixels.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ import cv2
 import numpy as np
 
 from app.claims.rules import ClaimRules
-from app.claims.table_grid import Word, build_grid, cluster
+from app.claims.table_grid import Table, Word, build_table, cluster
 
 
-def grid_from_picture(gray: np.ndarray, segments: list[Word], rules: ClaimRules) -> list[list[str | None]]:
+def table_from_picture(gray: np.ndarray, segments: list[Word], rules: ClaimRules) -> Table:
     rows, cols = find_lines(gray, rules)
-    return build_grid(split_words(segments), rows, cols, rules.image_min_band_px)
+    return build_table(split_words(segments), rows, cols, rules.image_min_band_px)
 
 
 def find_lines(gray: np.ndarray, rules: ClaimRules) -> tuple[list[float], list[float]]:

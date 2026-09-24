@@ -96,7 +96,7 @@ class FilePanel(QWidget):
         """Show which claim sheet and which receipts are being checked."""
         self._sheet_path = sheet
         self.sheet_slot.setText(f"<b>Claim sheet:</b> {sheet.name}" if sheet else "<b>Claim sheet:</b> — (click an "
-                                "Excel file, or right-click → Use as claim sheet)")
+                                "exported claim-sheet PDF, or right-click → Use as claim sheet)")
         self.receipts_slot.setText(f"<b>Receipts:</b> {receipts.name}" if receipts else "<b>Receipts:</b> — (click a PDF)")
         self._clear_sheet.setEnabled(sheet is not None)
         for i in range(self._list.count()):
