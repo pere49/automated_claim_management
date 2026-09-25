@@ -1,0 +1,7 @@
+{
+  "claimant_labels": ["claimant", "individual", "employee", "name"],
+  "project_labels": ["project"],
+  "date_labels": ["date", "claim date"],
+  "amount_labels": ["total", "grand total", "amount", "total claimed", "total paid"],
+  "date_formats": ["%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"]
+}

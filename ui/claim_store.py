@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 from datetime import datetime
+from decimal import Decimal
 from typing import List, Dict, Any, Optional
 
 DEFAULT_CLAIMS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "claims_data"))
@@ -45,18 +46,36 @@ class ClaimItem:
         return self.metadata.get("project_name", "N/A")
 
     @property
-    def claimed_amount(self) -> float:
-        return float(self.metadata.get("claimed_amount", 0.0))
+    def claimed_amount(self) -> Decimal:
+        return Decimal(str(self.metadata.get("claimed_amount", "0.00")))
 
     @property
-    def verified_amount(self) -> float:
-        return float(self.metadata.get("verified_amount", 0.0))
+    def verified_amount(self) -> Decimal:
+        return Decimal(str(self.metadata.get("verified_amount", "0.00")))
+
+    @property
+    def ocr_result(self) -> Dict[str, Any]:
+        value = self.metadata.get("ocr_result", {})
+        return value if isinstance(value, dict) else {}
 
     def save_metadata(self):
         self.metadata["updated_at"] = datetime.now().isoformat()
         meta_path = os.path.join(self.dir_path, "claim_meta.json")
         with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(self.metadata, f, indent=2)
+            json.dump(_json_safe(self.metadata), f, indent=2)
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert exact in-memory amounts to JSON-safe decimal strings."""
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [_json_safe(item) for item in value]
+    return value
 
 class ClaimStore:
     def __init__(self, root_dir: str = DEFAULT_CLAIMS_DIR):
@@ -172,11 +191,12 @@ class ClaimStore:
         month_year: str,
         individual_name: str,
         project_name: str,
-        claimed_amount: float,
+        claimed_amount: Decimal | str | float,
         claim_date: str,
         claim_pdf_src: str,
         statement_src: Optional[str] = None,
-        receipt_srcs: List[str] = None
+        receipt_srcs: List[str] = None,
+        ocr_result: Optional[Dict[str, Any]] = None
     ) -> ClaimItem:
         # Normalize folder name
         clean_name = individual_name.strip().replace(" ", "_")
@@ -207,13 +227,15 @@ class ClaimStore:
             "individual_name": individual_name,
             "project_name": project_name,
             "claim_date": claim_date,
-            "claimed_amount": float(claimed_amount),
-            "verified_amount": float(claimed_amount),
+            "claimed_amount": str(Decimal(str(claimed_amount)).quantize(Decimal("0.01"))),
+            "verified_amount": str(Decimal(str(claimed_amount)).quantize(Decimal("0.01"))),
             "status": "Pending",
             "verifier_notes": "",
             "verified_by": "",
             "updated_at": datetime.now().isoformat()
         }
+        if ocr_result is not None:
+            meta["ocr_result"] = ocr_result
 
         item = ClaimItem(
             month_year=month_year,

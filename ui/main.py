@@ -50,6 +50,7 @@ def main(page: ft.Page):
     # Register FilePickers in page.services (Flet 1.0 non-visual services)
     page.services.extend([
         uploader_view.claim_picker,
+        uploader_view.combined_picker,
         uploader_view.statement_picker,
         uploader_view.receipts_picker
     ])

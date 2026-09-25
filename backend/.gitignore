@@ -1,0 +1,121 @@
+# What must never reach the repository.
+# Rule of thumb: code, config rules, docs and tests are committed; every claim
+# document, every real value (names, PINs, amounts) and anything generated
+# from them is not. When in doubt, keep it out and ask.
+
+# ---------------------------------------------------------------- claim documents, anywhere in the tree
+# Receipts, claim spreadsheets and anything derived from them. Tests generate
+# their own synthetic files in temporary folders, so nothing here is needed.
+images/
+real_documents/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.heif
+*.tif
+*.tiff
+*.bmp
+*.gif
+*.webp
+*.xlsx
+*.xlsm
+*.xls
+*.xltx
+*.csv
+*.tsv
+*.ods
+*.docx
+*.doc
+*.odt
+*.pptx
+# Office lock files: named after the open file and hold the user's name
+~$*
+# Emails and attachments (the planned email-based intake)
+*.eml
+*.msg
+*.mbox
+*.pst
+attachments/
+inbox/
+# Archives that may bundle any of the above
+*.zip
+*.7z
+*.rar
+
+# ---------------------------------------------------------------- real values: people, PINs, company tax IDs
+# Real person-to-PIN pairs and company tax IDs are supplied at search time and
+# never committed. Keep them in private/, or name the file so it matches one
+# of these patterns. A committed template must be named *.example.json and
+# hold fabricated values only.
+private/
+*.private.*
+*.local.json
+*.local.yaml
+*.local.toml
+person_pins*
+*_pins.*
+pins.*
+company_settings.json
+!*.example.json
+
+# ---------------------------------------------------------------- secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*.p12
+*.crt
+credentials*
+secrets*
+*secret*.json
+*token*.json
+
+# ---------------------------------------------------------------- case data, results and diagnostics
+# Review decisions, OCR results and reports all contain document content.
+case_data/
+outputs/
+reports/
+exports/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.log
+logs/
+# Error-tab screenshots show document text
+screenshots/
+
+# ---------------------------------------------------------------- models and large files
+models/
+*.onnx
+
+# ---------------------------------------------------------------- Python environment, builds, caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+*.tmp
+*.bak
+
+# ---------------------------------------------------------------- editors, OS, local assistant settings
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+.claude/settings.local.json
+CLAUDE.local.md

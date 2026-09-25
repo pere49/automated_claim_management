@@ -1,5 +1,6 @@
 import flet as ft
 import os
+from decimal import Decimal, InvalidOperation
 from typing import List, Optional
 from claim_store import ClaimStore, ClaimItem
 from pdf_utils import render_pdf_page_to_base64, get_pdf_page_count, image_file_to_base64
@@ -18,7 +19,7 @@ class VerifierView(ft.Container):
         # Left PDF Viewer State
         self.left_pdf_page = 0
         self.left_pdf_total_pages = 0
-        self.left_pdf_zoom = 1.6
+        self.left_pdf_zoom = 2.2
 
         # Right Viewer State
         self.right_tab_mode = "receipts" # "statement" or "receipts"
@@ -106,10 +107,26 @@ class VerifierView(ft.Container):
         self.left_zoom_out = ft.IconButton(ft.Icons.ZOOM_OUT, on_click=lambda _: self._zoom_left(-0.2))
 
         DUMMY_IMG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-        self.left_image = ft.Image(src=DUMMY_IMG, fit=ft.BoxFit.CONTAIN, width=400, height=600, expand=False)
+        self.left_image = ft.Image(src=DUMMY_IMG, fit=ft.BoxFit.CONTAIN, width=500, height=680, expand=False)
         self.left_placeholder = ft.Text("No Claim PDF found", color=ft.Colors.OUTLINE)
+        self.claim_sidebar = ft.ListView(spacing=4, expand=True)
+        claim_sidebar = ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("Claimants", size=15, weight=ft.FontWeight.BOLD),
+                    ft.Text("Select a name to review their claim.", size=11, color=ft.Colors.SECONDARY),
+                    self.claim_sidebar,
+                ],
+                expand=True,
+                spacing=8,
+            ),
+            width=220,
+            padding=10,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+            border_radius=8,
+        )
 
-        left_pane = ft.Container(width=420, height=650, expand=False,
+        left_pane = ft.Container(width=540, height=720, expand=False,
             content=ft.Column(
                 [
                     ft.Container(
@@ -214,7 +231,8 @@ class VerifierView(ft.Container):
 
         # Dual split view
         split_viewer = ft.Row(
-            [left_pane, ft.VerticalDivider(width=2, color=ft.Colors.OUTLINE_VARIANT), right_pane],
+            [claim_sidebar, ft.VerticalDivider(width=2, color=ft.Colors.OUTLINE_VARIANT),
+             left_pane, ft.VerticalDivider(width=2, color=ft.Colors.OUTLINE_VARIANT), right_pane],
             expand=True,
             spacing=10
         )
@@ -323,6 +341,7 @@ class VerifierView(ft.Container):
             filtered.append(item)
 
         self.claims = filtered
+        self._refresh_claim_sidebar()
         if not self.claims:
             self.current_index = 0
             self.current_claim = None
@@ -332,6 +351,29 @@ class VerifierView(ft.Container):
             self.current_claim = self.claims[self.current_index]
 
         self._render_current_claim()
+
+    def _refresh_claim_sidebar(self):
+        self.claim_sidebar.controls.clear()
+        for index, claim in enumerate(self.claims):
+            selected = index == self.current_index
+            label = claim.individual_name.replace("_", " ")
+            decision = claim.ocr_result.get("suggested_decision", "")
+            suffix = f" · {decision}" if decision else ""
+            self.claim_sidebar.controls.append(
+                ft.Container(
+                    content=ft.Text(f"{label}{suffix}", max_lines=2, overflow=ft.TextOverflow.ELLIPSIS),
+                    padding=ft.Padding.symmetric(horizontal=8, vertical=8),
+                    bgcolor=ft.Colors.BLUE_900 if selected else None,
+                    border_radius=6,
+                    on_click=lambda _, i=index: self._select_claim_from_sidebar(i),
+                )
+            )
+
+    def _select_claim_from_sidebar(self, index: int):
+        if 0 <= index < len(self.claims):
+            self.current_index = index
+            self.current_claim = self.claims[index]
+            self._render_current_claim()
 
     def _on_filter_changed(self, e):
         self.current_index = 0
@@ -373,14 +415,19 @@ class VerifierView(ft.Container):
 
         claim = self.current_claim
         st = claim.status
-        self.status_radio_group.value = st
-        if st == "Verified":
+        suggested_status = self._suggested_ui_status(claim)
+        display_status = suggested_status if st == "Pending" and suggested_status is not None else st
+        if display_status != st:
+            self.status_radio_group.value = display_status
+        else:
+            self.status_radio_group.value = st
+        if display_status == "Verified":
             self.status_chip.content.value = "VERIFIED"
             self.status_chip.bgcolor = ft.Colors.GREEN_700
-        elif st == "Rejected":
+        elif display_status == "Rejected":
             self.status_chip.content.value = "REJECTED"
             self.status_chip.bgcolor = ft.Colors.RED_700
-        elif st == "Needs Revision":
+        elif display_status == "Needs Revision":
             self.status_chip.content.value = "REVISION"
             self.status_chip.bgcolor = ft.Colors.AMBER_800
         else:
@@ -392,8 +439,18 @@ class VerifierView(ft.Container):
         self.info_project_text.value = f"Project: {claim.project_name}"
         self.info_amount_text.value = f"Claimed: ${claim.claimed_amount:,.2f}"
 
-        self.verified_amount_field.value = str(claim.metadata.get("verified_amount", claim.claimed_amount))
+        extracted = claim.ocr_result.get("extracted", {})
+        table_total = claim.ocr_result.get("table", {}).get("Total")
+        ocr_amount = extracted.get("claimed_amount") or table_total
+        if ocr_amount:
+            display_amount = ocr_amount
+        else:
+            display_amount = claim.metadata.get("verified_amount") or claim.claimed_amount
+        self.verified_amount_field.value = f"{Decimal(str(display_amount)).quantize(Decimal('0.01')):.2f}"
         self.notes_field.value = claim.metadata.get("verifier_notes", "")
+        ocr_result = claim.ocr_result
+        if ocr_result.get("errors") and not self.notes_field.value:
+            self.notes_field.value = "OCR review required: " + " | ".join(ocr_result["errors"])
 
         # Render Left PDF (Claim Form)
         self.left_pdf_page = 0
@@ -577,14 +634,23 @@ class VerifierView(ft.Container):
             self.status_chip.bgcolor = ft.Colors.ORANGE_800
         self.page.update()
 
+    @staticmethod
+    def _suggested_ui_status(claim: ClaimItem) -> Optional[str]:
+        decision = claim.ocr_result.get("suggested_decision")
+        return {
+            "PASS": "Verified",
+            "CAUTION": "Needs Revision",
+            "REVIEW": "Pending",
+        }.get(decision)
+
     def _save_and_next(self, e):
         if not self.current_claim:
             return
 
         st = self.status_radio_group.value or "Pending"
         try:
-            v_amt = float(self.verified_amount_field.value or 0.0)
-        except ValueError:
+            v_amt = Decimal(str(self.verified_amount_field.value or "0")).quantize(Decimal("0.01"))
+        except (InvalidOperation, ValueError):
             v_amt = self.current_claim.claimed_amount
 
         self.current_claim.metadata["status"] = st

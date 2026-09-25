@@ -1,8 +1,11 @@
 import flet as ft
 import os
+import asyncio
+from decimal import Decimal
 from datetime import datetime
 from typing import List, Optional
 from claim_store import ClaimStore
+from backend_bridge import ClaimProcessor
 
 def show_snack(page, text: str, bgcolor=None):
     if not page:
@@ -27,61 +30,33 @@ class UploaderView(ft.Container):
         self.expand = True
 
         self.claim_pdf_path: Optional[str] = None
+        self.combined_pdf_path: Optional[str] = None
         self.statement_path: Optional[str] = None
         self.receipt_paths: List[str] = []
 
         # Instantiate FilePickers
         self.claim_picker = ft.FilePicker()
+        self.combined_picker = ft.FilePicker()
         self.statement_picker = ft.FilePicker()
         self.receipts_picker = ft.FilePicker()
+        self.claim_processor = ClaimProcessor()
+        self.processing = False
 
         self._build_ui()
 
     def _build_ui(self):
-        now = datetime.now()
-        default_month = now.strftime("%m_%Y")
-        default_date = now.strftime("%Y-%m-%d")
-
-        # Explicitly sized Form Controls to eliminate Flutter layout constraint issues
-        self.month_field = ft.TextField(
-            label="Month & Year (mm_yyyy)",
-            value=default_month,
-            width=220,
-            hint_text="e.g. 09_2026",
-            prefix_icon=ft.Icons.CALENDAR_MONTH
-        )
-        self.name_field = ft.TextField(
-            label="Individual / Employee Name",
-            hint_text="e.g. John Doe",
-            width=470,
-            prefix_icon=ft.Icons.PERSON
-        )
-        self.project_field = ft.TextField(
-            label="Project Name",
-            hint_text="e.g. Project Alpha - Logistics",
-            width=705,
-            prefix_icon=ft.Icons.WORK
-        )
-        self.date_field = ft.TextField(
-            label="Claim Date",
-            value=default_date,
-            width=220,
-            prefix_icon=ft.Icons.EVENT
-        )
-        self.amount_field = ft.TextField(
-            label="Total Claimed Amount ($)",
-            hint_text="e.g. 450.00",
-            width=240,
-            prefix_icon=ft.Icons.ATTACH_MONEY,
-            keyboard_type=ft.KeyboardType.NUMBER
-        )
-
         # File Selection Buttons & Labels
         self.claim_pdf_text = ft.Text("No Claim PDF selected", color=ft.Colors.OUTLINE, size=13)
         self.claim_pdf_btn = ft.OutlinedButton(
-            "Select Claim PDF*",
+            "Select Claim PDF (Optional)",
             icon=ft.Icons.PICTURE_AS_PDF,
             on_click=self._on_select_claim_pdf
+        )
+        self.combined_pdf_text = ft.Text("No Combined PDF selected (Optional)", color=ft.Colors.OUTLINE, size=13)
+        self.combined_pdf_btn = ft.OutlinedButton(
+            "Select Combined PDF (Optional)",
+            icon=ft.Icons.PICTURE_AS_PDF,
+            on_click=self._on_select_combined_pdf,
         )
 
         self.statement_text = ft.Text("No Bank Statement selected (Optional)", color=ft.Colors.OUTLINE, size=13)
@@ -93,7 +68,7 @@ class UploaderView(ft.Container):
 
         self.receipts_text = ft.Text("No Receipts selected", color=ft.Colors.OUTLINE, size=13)
         self.receipts_btn = ft.OutlinedButton(
-            "Select Receipts/Proofs*",
+            "Select Receipts/Proofs (Optional)",
             icon=ft.Icons.RECEIPT,
             on_click=self._on_select_receipts
         )
@@ -113,26 +88,12 @@ class UploaderView(ft.Container):
                 padding=25,
                 content=ft.Column(
                     [
-                        ft.Row([
-                            ft.Icon(ft.Icons.FILE_UPLOAD, size=28, color=ft.Colors.BLUE_400),
-                            ft.Text("Submit New Project Payment Claim", size=20, weight=ft.FontWeight.BOLD)
-                        ]),
-                        ft.Text(
-                            "Uploaded documents will be automatically formatted and organized into "
-                            "the claims directory structure: mm_yyyy/individual_name/",
-                            color=ft.Colors.SECONDARY,
-                            size=13
-                        ),
-                        ft.Divider(height=20),
-                        ft.Row([self.month_field, self.name_field], spacing=15),
-                        ft.Row([self.project_field], spacing=15),
-                        ft.Row([self.date_field, self.amount_field], spacing=15),
-                        ft.Divider(height=20),
-                        
                         # File Slots
                         ft.Text("Document Attachments", weight=ft.FontWeight.BOLD, size=15),
                         ft.Container(
                             content=ft.Column([
+                                ft.Row([self.combined_pdf_btn, self.combined_pdf_text], alignment=ft.MainAxisAlignment.START),
+                                ft.Divider(height=1),
                                 ft.Row([self.claim_pdf_btn, self.claim_pdf_text], alignment=ft.MainAxisAlignment.START),
                                 ft.Row([self.statement_btn, self.statement_text], alignment=ft.MainAxisAlignment.START),
                                 ft.Row([self.receipts_btn, self.receipts_text], alignment=ft.MainAxisAlignment.START),
@@ -210,6 +171,28 @@ class UploaderView(ft.Container):
         except RuntimeError:
             pass
 
+    async def _on_select_combined_pdf(self, e):
+        files = await self.combined_picker.pick_files(
+            dialog_title="Select Combined Claim Documents PDF",
+            file_type=ft.FilePickerFileType.CUSTOM,
+            allowed_extensions=["pdf"],
+            allow_multiple=False,
+        )
+        if files and files[0].path:
+            self.combined_pdf_path = files[0].path
+            fname = files[0].name or os.path.basename(self.combined_pdf_path)
+            self.combined_pdf_text.value = f"Selected: {fname}"
+            self.combined_pdf_text.color = ft.Colors.GREEN_400
+        else:
+            self.combined_pdf_path = None
+            self.combined_pdf_text.value = "No Combined PDF selected (Optional)"
+            self.combined_pdf_text.color = ft.Colors.OUTLINE
+        try:
+            if self.page:
+                self.page.update()
+        except RuntimeError:
+            pass
+
     async def _on_select_receipts(self, e):
         files = await self.receipts_picker.pick_files(
             dialog_title="Select Receipt Image(s) / PDF(s)",
@@ -232,62 +215,72 @@ class UploaderView(ft.Container):
         except RuntimeError:
             pass
 
-    def _submit_claim(self, e):
-        month = (self.month_field.value or "").strip()
-        name = (self.name_field.value or "").strip()
-        project = (self.project_field.value or "").strip()
-        amt_str = (self.amount_field.value or "").strip()
-        c_date = (self.date_field.value or "").strip()
-
+    async def _submit_claim(self, e):
         # Validation
         errors = []
-        if not month:
-            errors.append("Month & Year (mm_yyyy) is required.")
-        if not name:
-            errors.append("Individual Name is required.")
-        if not project:
-            errors.append("Project Name is required.")
-        if not self.claim_pdf_path:
-            errors.append("Claim Form PDF is required.")
-        if not self.receipt_paths:
-            errors.append("At least one Receipt / Proof file is required.")
-
-        try:
-            amount = float(amt_str)
-            if amount <= 0:
-                errors.append("Claimed Amount must be greater than $0.")
-        except ValueError:
-            errors.append("Claimed Amount must be a valid number.")
+        source_pdf = self.claim_pdf_path or self.combined_pdf_path
+        if not source_pdf:
+            errors.append("Select a Claim PDF or Combined PDF.")
 
         if errors:
             show_snack(self.page, "Validation Error: " + " | ".join(errors), bgcolor=ft.Colors.RED_700)
             return
 
-        # Create claim via store
+        month = datetime.now().strftime("%m_%Y")
+        name = "Unassigned"
+        project = "OCR Pending"
+        c_date = datetime.now().strftime("%Y-%m-%d")
+
+        self.processing = True
+        self.submit_btn.disabled = True
+        show_snack(self.page, "Processing claim document with OCR...", bgcolor=ft.Colors.BLUE_700)
         try:
+            ocr_result = await asyncio.to_thread(
+                self.claim_processor.process_claim,
+                source_pdf,
+                claim_date=c_date,
+                claimed_amount=None,
+            )
+            extracted = ocr_result.extracted
+            month = extracted.get("claim_date", c_date)[:7].replace("-", "_") if extracted.get("claim_date") else month
+            name = extracted.get("individual_name", name)
+            project = extracted.get("project_name", project)
+            c_date = extracted.get("claim_date", c_date)
+            if extracted.get("claimed_amount"):
+                amount = Decimal(extracted["claimed_amount"])
+            else:
+                amount = Decimal("0.00")
             item = self.store.create_claim(
                 month_year=month,
                 individual_name=name,
                 project_name=project,
                 claimed_amount=amount,
                 claim_date=c_date,
-                claim_pdf_src=self.claim_pdf_path,
+                claim_pdf_src=source_pdf,
                 statement_src=self.statement_path,
-                receipt_srcs=self.receipt_paths
+                receipt_srcs=self.receipt_paths,
+                ocr_result=ocr_result.to_dict(),
             )
 
-            # Success Alert
-            show_snack(self.page, f"Claim for {name} ({month}) successfully created in directory!", bgcolor=ft.Colors.GREEN_700)
+            if ocr_result.status == "failed":
+                message = "Claim saved, but OCR requires review: " + " | ".join(ocr_result.errors)
+                show_snack(self.page, message, bgcolor=ft.Colors.ORANGE_800)
+            else:
+                show_snack(
+                    self.page,
+                    f"Claim for {name} ({month}) successfully created in directory!",
+                    bgcolor=ft.Colors.GREEN_700,
+                )
 
             # Reset form
-            self.name_field.value = ""
-            self.project_field.value = ""
-            self.amount_field.value = ""
             self.claim_pdf_path = None
+            self.combined_pdf_path = None
             self.statement_path = None
             self.receipt_paths = []
             self.claim_pdf_text.value = "No Claim PDF selected"
             self.claim_pdf_text.color = ft.Colors.OUTLINE
+            self.combined_pdf_text.value = "No Combined PDF selected (Optional)"
+            self.combined_pdf_text.color = ft.Colors.OUTLINE
             self.statement_text.value = "No Bank Statement selected (Optional)"
             self.statement_text.color = ft.Colors.OUTLINE
             self.receipts_text.value = "No Receipts selected"
@@ -303,3 +296,6 @@ class UploaderView(ft.Container):
                 pass
         except Exception as ex:
             show_snack(self.page, f"Failed to save claim: {ex}", bgcolor=ft.Colors.RED_700)
+        finally:
+            self.processing = False
+            self.submit_btn.disabled = False

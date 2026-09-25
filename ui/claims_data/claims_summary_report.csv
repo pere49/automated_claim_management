@@ -1,0 +1,5 @@
+Month_Year,Individual_Name,Project_Name,Claim_Date,Claimed_Amount,Verified_Amount,Status,Verifier_Notes,Updated_At,Directory_Path
+09_2026,David_Chen,Project Horizon - Cloud Infrastructure,2026-09-10,1290.0,1290.0,Verified,All server renewal receipts verified against bank statement.,2026-09-24T13:57:08.350218,C:\Users\kevin\.gemini\antigravity\scratch\claim_verifier_app\ui\claims_data\09_2026\David_Chen
+09_2026,Sarah_Jenkins,Project Alpha - Logistics & Transport,2026-09-10,485.5,485.5,Pending,,2026-09-24T13:57:08.258393,C:\Users\kevin\.gemini\antigravity\scratch\claim_verifier_app\ui\claims_data\09_2026\Sarah_Jenkins
+09_2026,Unassigned,OCR Pending,2026-09-24,13000.00,13000.00,Pending,,2026-09-24T16:18:37.400653,C:\Users\kevin\.gemini\antigravity\scratch\claim_verifier_app\ui\claims_data\09_2026\Unassigned
+08_2026,Maria_Garcia,Project Marketing - Q3 Campaign,2026-09-10,750.0,750.00,Verified,Receipt #2 missing vendor name stamp.,2026-09-24T16:19:07.623585,C:\Users\kevin\.gemini\antigravity\scratch\claim_verifier_app\ui\claims_data\08_2026\Maria_Garcia
