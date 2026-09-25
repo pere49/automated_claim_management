@@ -30,6 +30,7 @@ from PySide6.QtCore import QCoreApplication, QObject, QThread, Signal, Slot
 from app.errors import ERROR, WARNING, StageError
 from app.gui import page_renderer
 from app.gui.document_cache import CachedDocument, DocumentCache, PageReading, file_key
+from app.gui.ocr_export import export_document
 from app.gui.ocr_worker import CANCELLED, FAILED, FINISHED, OcrWorker
 from app.gui.settings import GuiSettings
 from app.layout import RowRules, TextRow, group_rows, load_row_rules, ungrouped_rows
@@ -253,6 +254,11 @@ class DocumentSession(QObject):
             return  # the file changed on disk since this job started
         rows, grouped = self._rows_for(doc, result)
         doc.pages[result.page_number] = PageReading(result, rows, grouped)
+        if self._settings.ocr_export_path is not None:
+            try:
+                export_document(doc, self._settings.ocr_export_path)
+            except StageError as exc:
+                self.problem.emit(exc, WARNING)
         self.file_state_changed.emit(doc.path, self._state_text(doc))
         if doc is self.current:
             self.page_ready.emit(result.page_number)

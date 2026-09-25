@@ -1,0 +1,250 @@
+{
+  "_about": "Framework-neutral shared state envelope for a Flet UI and the offline claim-verifier model.",
+  "_usage": "The UI writes input and ui state before a run. The model reads input and writes output and diagnostics. OCR is currently held in memory only; the ocr section describes the shared shape for a future export. Keep document text and secrets out of logs.",
+  "schema_version": "1.0",
+  "environment": {
+    "application": "claim_verifier",
+    "mode": "offline",
+    "runtime": "desktop",
+    "locale": "en-KE",
+    "timezone": "Africa/Nairobi",
+    "created_at": null,
+    "updated_at": null,
+    "session_id": null,
+    "request_id": null
+  },
+  "input": {
+    "_about": "Values supplied by the Flet UI to one model run.",
+    "documents": [
+      {
+        "document_id": null,
+        "doc_path": null,
+        "role": "claim_sheet",
+        "kind": "pdf",
+        "display_name": null,
+        "page_range": null,
+        "enabled": true
+      },
+      {
+        "document_id": null,
+        "doc_path": null,
+        "role": "receipts",
+        "kind": "pdf",
+        "display_name": null,
+        "page_range": null,
+        "enabled": true
+      }
+    ],
+    "filters": {
+      "_about": "Optional UI filters. Empty values mean no additional filter.",
+      "claim_ids": [],
+      "row_numbers": [],
+      "date_from": null,
+      "date_to": null,
+      "statuses": [],
+      "page_numbers": [],
+      "search_text": null
+    },
+    "options": {
+      "_about": "Run options selected in the UI; do not put decision rules here.",
+      "pin_required": true,
+      "include_unreadable_pages": true,
+      "include_repeated_pages": true,
+      "reprocess_existing_results": false,
+      "max_documents": null,
+      "max_pages": null
+    },
+    "model": {
+      "_about": "Model selection and execution settings. Runtime remains offline.",
+      "name": null,
+      "version": null,
+      "provider": "local",
+      "temperature": null,
+      "max_tokens": null,
+      "system_prompt_id": null,
+      "rules_config_path": null
+    },
+    "paths": {
+      "_about": "Paths used by the run. The output directory must be writable. OCR is not currently persisted by the application.",
+      "workspace_path": null,
+      "output_path": null,
+      "cache_path": null,
+      "config_path": null,
+      "ocr_output_path": null
+    }
+  },
+  "output": {
+    "_about": "Model-produced results. A missing or conflicting value must not become PASS.",
+    "run_id": null,
+    "output_path": null,
+    "status": "not_started",
+    "started_at": null,
+    "finished_at": null,
+    "date": null,
+    "duration_ms": null,
+    "summary": {
+      "total_items": 0,
+      "pass_count": 0,
+      "caution_count": 0,
+      "review_count": 0,
+      "unreadable_page_count": 0,
+      "repeated_page_count": 0
+    },
+    "results": [
+      {
+        "result_id": null,
+        "claim_id": null,
+        "row_number": null,
+        "claimed_date": null,
+        "claimed_amount": null,
+        "currency": null,
+        "decision": "REVIEW",
+        "colour": "red",
+        "reason_code": null,
+        "reason": null,
+        "detail": null,
+        "receipt": {
+          "page": null,
+          "doc_path": null,
+          "date_found": null,
+          "amount_found": null,
+          "pin_found": null,
+          "amount_is_total": null,
+          "repeated": null
+        },
+        "evidence": [
+          {
+            "page": null,
+            "field": null,
+            "value": null,
+            "confidence": null,
+            "match_type": null,
+            "bbox": null
+          }
+        ],
+        "officer_review": {
+          "state": "pending",
+          "comment": null,
+          "reviewed_at": null,
+          "reviewed_by": null
+        }
+      }
+    ],
+    "totals": {
+      "claimed": null,
+      "approved": null,
+      "grand_total": null,
+      "grand_total_status": "REVIEW",
+      "rows_disagreeing": []
+    },
+    "ocr": {
+      "_about": "OCR readings are currently stored in DocumentSession.cache in memory and are lost when the application closes.",
+      "storage": "memory",
+      "persisted": false,
+      "cache_lifetime": "application_session",
+      "export_path": null,
+      "documents": [
+        {
+          "document_id": null,
+          "doc_path": null,
+          "page_count": 0,
+          "pages": [
+            {
+              "page": null,
+              "status": "not_started",
+              "words": [
+                {
+                  "text": null,
+                  "confidence": null,
+                  "box": null,
+                  "page_box": null
+                }
+              ],
+              "rows": [],
+              "warning": null,
+              "error": null,
+              "seconds": null
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "ui": {
+    "_about": "Flet-only presentation state. The model must not depend on this section.",
+    "active_view": "documents",
+    "selected_document_id": null,
+    "selected_result_id": null,
+    "selected_page": null,
+    "expanded_sections": [],
+    "filters_visible": false,
+    "is_busy": false,
+    "progress": {
+      "stage": null,
+      "completed": 0,
+      "total": 0,
+      "message": null
+    },
+    "notifications": [],
+    "last_error_id": null
+  },
+  "diagnostics": {
+    "_about": "Structured, screenshot-friendly diagnostics. Never include document text, names, amounts, PINs, or credentials.",
+    "errors": [
+      {
+        "error_id": null,
+        "stage": null,
+        "severity": "error",
+        "summary": null,
+        "detail": null,
+        "file": null,
+        "page": null,
+        "occurred_at": null,
+        "recoverable": true
+      }
+    ],
+    "warnings": [],
+    "events": [
+      {
+        "event_id": null,
+        "event": null,
+        "stage": null,
+        "occurred_at": null,
+        "duration_ms": null
+      }
+    ]
+  },
+  "contract": {
+    "_about": "Values the UI can use to render controls and validate responses.",
+    "allowed_input_roles": [
+      "claim_sheet",
+      "receipts"
+    ],
+    "allowed_decisions": [
+      "PASS",
+      "CAUTION",
+      "REVIEW"
+    ],
+    "allowed_run_statuses": [
+      "not_started",
+      "queued",
+      "running",
+      "completed",
+      "completed_with_errors",
+      "failed",
+      "cancelled"
+    ],
+    "allowed_officer_review_states": [
+      "pending",
+      "approved",
+      "declined",
+      "needs_review"
+    ],
+    "required_result_fields": [
+      "result_id",
+      "decision",
+      "reason_code",
+      "detail"
+    ]
+  }
+}

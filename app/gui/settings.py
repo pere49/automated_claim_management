@@ -47,6 +47,7 @@ class GuiSettings:
     badge_font_pt: int
     badge_padding_px: int
     badge_text_colour: str
+    ocr_export_path: Path | None
     company_pin_file: Path
     company_pin_key: str
 
@@ -60,7 +61,7 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
         "shutdown_wait_seconds": int, "read_ahead": bool, "display_dpi": int, "page_gap_px": int,
         "render_margin_pages": int, "highlight_colours": dict, "highlight_fill_alpha": int, "neighbour_alpha": int,
         "highlight_line_px": int, "tour": dict, "status_colours": dict, "sheet_view": dict, "status_cards": dict, "badge": dict,
-        "company_pin_file": str, "company_pin_key": str,
+        "ocr_export_path": str, "company_pin_file": str, "company_pin_key": str,
     })
 
     def fail(message: str) -> StageError:
@@ -112,6 +113,7 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
         raise fail("'badge' needs font_pt (5-40), padding_px (0-40) and text_colour (like \"#ffffff\")")
     if not d["company_pin_file"].strip() or not d["company_pin_key"].strip():
         raise fail("'company_pin_file' and 'company_pin_key' must not be empty")
+    ocr_export_path = d["ocr_export_path"].strip()
     sizes = {}
     for key, count in (("window_size", 2), ("pane_widths", 3)):
         value = d[key]
@@ -137,6 +139,7 @@ def load_settings(path: Path = DEFAULT_SETTINGS) -> GuiSettings:
         label_height_frac=float(view["label_height_frac"]),
         card_tint_alpha=cards["tint_alpha"], card_value_pt=cards["value_pt"],
         badge_font_pt=badge["font_pt"], badge_padding_px=badge["padding_px"], badge_text_colour=badge["text_colour"],
+        ocr_export_path=paths.resolve(ocr_export_path) if ocr_export_path else None,
         company_pin_file=paths.resolve(d["company_pin_file"]), company_pin_key=d["company_pin_key"].strip(),
     )
 

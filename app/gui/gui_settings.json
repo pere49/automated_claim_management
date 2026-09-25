@@ -80,6 +80,8 @@
     "padding_px": 4,
     "text_colour": "#ffffff"
   },
+  "ocr_export_path": "",
+  "_ocr_export_path": "Optional JSON snapshot of OCR readings. Empty disables export and preserves the original memory-only behaviour. Example: outputs/ocr_readings.json.",
   "_badge": "The solid badge in each receipt page's top-right corner (D35): its text size and padding on screen (it stays the same size at any zoom) and its text colour; the fill is the page's status colour.",
   "company_pin_file": ".env",
   "company_pin_key": "COMPANY_PINS",
